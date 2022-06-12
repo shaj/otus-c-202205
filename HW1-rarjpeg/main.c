@@ -102,7 +102,7 @@ bool get_extpart_pos(FILE *pfile, fpos_t *pos)
             cnt = fread(&buf, sizeof(buf), 1, pfile);
             if(cnt != 1)
             {
-                printf("Unexpected end of file\n");
+                perror("Unexpected end of file\n");
                 jpeg_err = true;
                 break;
             }
@@ -115,7 +115,7 @@ bool get_extpart_pos(FILE *pfile, fpos_t *pos)
             cnt = fread(&buf, sizeof(buf), 1, pfile);
             if(cnt != 1)
             {
-                printf("Unexpected end of file\n");
+                perror("Unexpected end of file\n");
                 jpeg_err = true;
                 break;
             }
@@ -126,7 +126,7 @@ bool get_extpart_pos(FILE *pfile, fpos_t *pos)
                 cnt = fread(&buf1, 1, 1, pfile);
                 if(cnt != 1)
                 {
-                    printf("Unexpected end of file\n");
+                    perror("Unexpected end of file\n");
                     jpeg_err = true;
                     break;
                 }
@@ -135,7 +135,7 @@ bool get_extpart_pos(FILE *pfile, fpos_t *pos)
                     cnt = fread(&buf1, 1, 1, pfile);
                     if(cnt != 1)
                     {
-                        printf("Unexpected end of file\n");
+                        perror("Unexpected end of file\n");
                         jpeg_err = true;
                         break;
                     }
@@ -161,7 +161,7 @@ bool get_extpart_pos(FILE *pfile, fpos_t *pos)
         }
         default:
             jpeg_err = true;
-            printf("jpeg err. Readed 0x%04x\n", buf);
+            fprintf(stderr, "jpeg err. Readed 0x%04x\n", buf);
             break;
         };
     }
@@ -217,7 +217,7 @@ void print_zip_file_list(FILE *pfile, fpos_t *zip_offset)
     cnt = fread(&eocdr, sizeof(eocdr), 1, pfile);
     if(cnt != 1)
     {
-        printf("Error while reading zip format (1)\n");
+        perror("Error while reading zip format\n");
         return;
     }
 
@@ -228,7 +228,7 @@ void print_zip_file_list(FILE *pfile, fpos_t *zip_offset)
         cnt = fread(&cdfh, sizeof(cdfh), 1, pfile);
         if(cnt != 1)
         {
-            printf("Error while reading zip format (2)\n");
+            perror("Error while reading zip format\n");
         }
 
         strlen = cdfh.filenameLength + cdfh.extraFieldLength + cdfh.fileCommentLength;
@@ -236,7 +236,7 @@ void print_zip_file_list(FILE *pfile, fpos_t *zip_offset)
         cnt = fread(str, strlen, 1, pfile);
         if(cnt != 1)
         {
-            printf("Error while reading zip format (2)\n");
+            perror("Error while reading zip format\n");
         }
         str[cdfh.filenameLength] = 0;
         printf("%s\n", str);
@@ -265,7 +265,7 @@ int main(int argc, char const *argv[])
     pfile = fopen(argv[1], "rb");
     if(pfile == NULL)
     {
-        printf("Can not open file \"%s\"\n", argv[1]);
+        fprintf(stderr, "Can not open file \"%s\"\n", argv[1]);
         exit(1);
     }
 
