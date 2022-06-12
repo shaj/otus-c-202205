@@ -7,6 +7,11 @@
 
 #include "pkzip.h"
 
+
+/**
+ * @brief Маркеры формата JPEG
+ * 
+ */
 enum {
     JPEG_SOI = 0xd8ff,
     JPEG_S0F0 = 0xc0ff,
@@ -31,6 +36,17 @@ void print_version(const char *prog_name)
     printf("%s 0.0.0\n", prog_name);
 }
 
+
+/**
+ * @brief Проверка формата файла
+ * 
+ * Функция проверяет, что файл является JPEG файлом
+ * 
+ * @param pfile - указатель на объект FILE, открытый
+ *                для чтения в бинарном режиме
+ * @return true - файл является JPEG файлом
+ * @return false - файл не является JPEG файлом
+ */
 bool test_file(FILE *pfile)
 {
     size_t cnt;
@@ -40,6 +56,17 @@ bool test_file(FILE *pfile)
     return ((cnt == 1) && (buf == JPEG_SOI));
 }
 
+
+/**
+ * @brief Определение позиции конца формата JPEG
+ * 
+ * @param pfile - указатель на объект FILE, открытый
+ *                для чтения в бинарном режиме
+ * @param pos - указатель на структуру fpos_t в которой
+ *              возвращается позиция конца формата JPEG
+ * @return true - конец JPEG найден и позиция записана в pos
+ * @return false - конец JPEG не найден. pos остается без изменений
+ */
 bool get_extpart_pos(FILE *pfile, fpos_t *pos)
 {
     size_t cnt;
@@ -72,7 +99,6 @@ bool get_extpart_pos(FILE *pfile, fpos_t *pos)
         case JPEG_RSTn:
         case JPEG_COM:
         {
-            printf("0x%04X  ", buf);
             cnt = fread(&buf, sizeof(buf), 1, pfile);
             if(cnt != 1)
             {
@@ -81,13 +107,11 @@ bool get_extpart_pos(FILE *pfile, fpos_t *pos)
                 break;
             }
             buf = ((buf & 0x00FF) << 8) | ((buf & 0xFF00) >> 8);
-            printf("0x%04X\n", buf);
             fseek(pfile, buf-2, SEEK_CUR);
             break;
         }
         case JPEG_SOS:
         {
-            printf("JPEG_SOS\n");
             cnt = fread(&buf, sizeof(buf), 1, pfile);
             if(cnt != 1)
             {
@@ -145,25 +169,42 @@ bool get_extpart_pos(FILE *pfile, fpos_t *pos)
     return jpeg_end_found;
 }
 
-bool test_extpart(FILE *pfile, fpos_t *zip_offset)
+
+/**
+ * @brief Проверка наличия и формата области файла за картинкой
+ * 
+ * @param pfile - указатель на объект FILE, открытый
+ *                для чтения в бинарном режиме
+ * @return true - данные есть и они в формате zip
+ * @return false - данных нет или формат данных не определен
+ */
+bool test_extpart(FILE *pfile)
 {
     size_t cnt;
-    EOCDR eocdr;
+    uint32_t buf;
 
-    fseek(pfile, -sizeof(eocdr), SEEK_END);
-    cnt = fread(&eocdr, sizeof(eocdr), 1, pfile);
+    fseek(pfile, -sizeof(EOCDR), SEEK_END);
+    cnt = fread(&buf, sizeof(buf), 1, pfile);
     if(cnt != 1)
     {
         return false;
     }
 
-    if(eocdr.signature == 0x06054B50)
+    if(buf == 0x06054B50)
     {
         return true;
     }
     return false;
 }
 
+
+/**
+ * @brief Печать списка файлов из zip архива прилепленного к картинке
+ * 
+ * @param pfile - указатель на объект FILE, открытый
+ *                для чтения в бинарном режиме
+ * @param zip_offset - смещение начала zip архива в файле
+ */
 void print_zip_file_list(FILE *pfile, fpos_t *zip_offset)
 {
     size_t cnt;
@@ -172,7 +213,6 @@ void print_zip_file_list(FILE *pfile, fpos_t *zip_offset)
     char *str;
     size_t strlen;
 
-    // fsetpos(pfile, zip_offset);
     fseek(pfile, -sizeof(eocdr), SEEK_END);
     cnt = fread(&eocdr, sizeof(eocdr), 1, pfile);
     if(cnt != 1)
@@ -180,13 +220,6 @@ void print_zip_file_list(FILE *pfile, fpos_t *zip_offset)
         printf("Error while reading zip format (1)\n");
         return;
     }
-
-    printf("EOCDR sig 0x%08X\neocdr is %lu\n", eocdr.signature, sizeof(eocdr));
-    printf("%d\n%d\n%d\n%d\n%d\n", eocdr.numberCentralDirectoryRecord,
-            eocdr.totalCentralDirectoryRecord,
-            eocdr.sizeOfCentralDirectory,
-            eocdr.centralDirectoryOffset,
-            eocdr.commentLength);
 
     fsetpos(pfile, zip_offset);
     fseek(pfile, eocdr.centralDirectoryOffset, SEEK_CUR);
@@ -198,7 +231,6 @@ void print_zip_file_list(FILE *pfile, fpos_t *zip_offset)
             printf("Error while reading zip format (2)\n");
         }
 
-        // printf("\nCentralDirectoryFileHeader sig 0x%08X\nfilenameLength %d\n", cdfh.signature, cdfh.filenameLength);
         strlen = cdfh.filenameLength + cdfh.extraFieldLength + cdfh.fileCommentLength;
         str = malloc(strlen + 1);
         cnt = fread(str, strlen, 1, pfile);
@@ -206,7 +238,6 @@ void print_zip_file_list(FILE *pfile, fpos_t *zip_offset)
         {
             printf("Error while reading zip format (2)\n");
         }
-        // str[strlen] = 0;
         str[cdfh.filenameLength] = 0;
         printf("%s\n", str);
         free(str);
@@ -244,7 +275,7 @@ int main(int argc, char const *argv[])
     if(test_file(pfile))
     {
         get_extpart_pos(pfile, &zip_offset);
-        if(test_extpart(pfile, &zip_offset))
+        if(test_extpart(pfile))
         {
             print_zip_file_list(pfile, &zip_offset);
             ret_val = 0;
