@@ -4,6 +4,10 @@
 #include <string.h>
 #include <stdint.h>
 #include <stdbool.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+
+#include <byteswap.h>
 
 #include "pkzip.h"
 
@@ -51,7 +55,10 @@ bool test_file(FILE *pfile)
 {
     size_t cnt;
     uint16_t buf;
-    fseek(pfile, 0, SEEK_SET);
+    if(fseek(pfile, 0, SEEK_SET) != 0)
+    {
+        return false;
+    }
     cnt = fread(&buf, 2, 1, pfile);
     return ((cnt == 1) && (buf == JPEG_SOI));
 }
@@ -70,26 +77,29 @@ bool test_file(FILE *pfile)
 bool get_extpart_pos(FILE *pfile, fpos_t *pos)
 {
     size_t cnt;
-    uint16_t buf;
-    uint8_t buf1;
+    uint16_t buf_16;
+    uint8_t buf_8;
     bool jpeg_end_found = false;
     bool jpeg_err = false;
 
-    fseek(pfile, 0, SEEK_SET);
-    cnt = fread(&buf, 2, 1, pfile);
-    if((cnt != 1) && (buf != JPEG_SOI))
+    if(fseek(pfile, 0, SEEK_SET) != 0)
+    {
+        return false;
+    }
+    cnt = fread(&buf_16, sizeof(buf_16), 1, pfile);
+    if((cnt != 1) && (buf_16 != JPEG_SOI))
     {
         return false;
     }
     while(!jpeg_end_found && !jpeg_err)
     {
-        cnt = fread(&buf, sizeof(buf), 1, pfile);
+        cnt = fread(&buf_16, sizeof(buf_16), 1, pfile);
         if(cnt != 1)
         {
             jpeg_err = true;
             break;
         }
-        switch(buf)
+        switch(buf_16)
         {
         case JPEG_S0F0:
         case JPEG_S0F2:
@@ -99,49 +109,65 @@ bool get_extpart_pos(FILE *pfile, fpos_t *pos)
         case JPEG_RSTn:
         case JPEG_COM:
         {
-            cnt = fread(&buf, sizeof(buf), 1, pfile);
+            cnt = fread(&buf_16, sizeof(buf_16), 1, pfile);
             if(cnt != 1)
             {
                 perror("Unexpected end of file\n");
                 jpeg_err = true;
                 break;
             }
-            buf = ((buf & 0x00FF) << 8) | ((buf & 0xFF00) >> 8);
-            fseek(pfile, buf-2, SEEK_CUR);
+            // Переставить байты в смещении
+            buf_16 = __bswap_16(buf_16);
+            if(fseek(pfile, buf_16-2, SEEK_CUR) != 0)
+            {
+                perror("Error parsing JPEG format\n");
+                jpeg_err = true;
+                break;
+            }
             break;
         }
         case JPEG_SOS:
         {
-            cnt = fread(&buf, sizeof(buf), 1, pfile);
+            cnt = fread(&buf_16, sizeof(buf_16), 1, pfile);
             if(cnt != 1)
             {
                 perror("Unexpected end of file\n");
                 jpeg_err = true;
                 break;
             }
-            buf = ((buf & 0x00FF) << 8) | ((buf & 0xFF00) >> 8);
-            fseek(pfile, buf-2, SEEK_CUR);
+            buf_16 = ((buf_16 & 0x00FF) << 8) | ((buf_16 & 0xFF00) >> 8);
+            if(fseek(pfile, buf_16-2, SEEK_CUR) != 0)
+            {
+                perror("Error parsing JPEG format\n");
+                jpeg_err = true;
+                break;
+            }
             while(!jpeg_end_found && !jpeg_err)
             {
-                cnt = fread(&buf1, 1, 1, pfile);
+                cnt = fread(&buf_8, sizeof(buf_8), 1, pfile);
                 if(cnt != 1)
                 {
                     perror("Unexpected end of file\n");
                     jpeg_err = true;
                     break;
                 }
-                if(buf1 == 0xff)
+                if(buf_8 == 0xff)
                 {
-                    cnt = fread(&buf1, 1, 1, pfile);
+                    cnt = fread(&buf_8, 1, 1, pfile);
                     if(cnt != 1)
                     {
                         perror("Unexpected end of file\n");
                         jpeg_err = true;
                         break;
                     }
-                    if(buf1 == 0xd9)
+                    if(buf_8 == 0xd9)
                     {
-                        fgetpos(pfile, pos);
+                        if(fgetpos(pfile, pos) != 0)
+                        {
+                            jpeg_err = true;
+                            perror("Error parsing JPEG format\n");
+                            break;
+                        }
                         jpeg_end_found = true;
                         break;
                     }
@@ -155,13 +181,18 @@ bool get_extpart_pos(FILE *pfile, fpos_t *pos)
         }
         case JPEG_EOI:
         {
-            fgetpos(pfile, pos);
+            if(fgetpos(pfile, pos) != 0)
+            {
+                jpeg_err = true;
+                perror("Error parsing JPEG format");
+                break;
+            }
             jpeg_end_found = true;
             break;
         }
         default:
             jpeg_err = true;
-            fprintf(stderr, "jpeg err. Readed 0x%04x\n", buf);
+            fprintf(stderr, "jpeg err. Readed 0x%04x\n", buf_16);
             break;
         };
     }
@@ -183,7 +214,11 @@ bool test_extpart(FILE *pfile)
     size_t cnt;
     uint32_t buf;
 
-    fseek(pfile, -sizeof(EOCDR), SEEK_END);
+    if(fseek(pfile, -sizeof(EOCDR), SEEK_END) != 0)
+    {
+        perror("Error while reading zip format\n");
+        return false;
+    }
     cnt = fread(&buf, sizeof(buf), 1, pfile);
     if(cnt != 1)
     {
@@ -213,7 +248,11 @@ void print_zip_file_list(FILE *pfile, fpos_t *zip_offset)
     char *str;
     size_t strlen;
 
-    fseek(pfile, -sizeof(eocdr), SEEK_END);
+    if(fseek(pfile, -sizeof(eocdr), SEEK_END) != 0)
+    {
+        perror("Error while reading zip format\n");
+        return;
+    }
     cnt = fread(&eocdr, sizeof(eocdr), 1, pfile);
     if(cnt != 1)
     {
@@ -221,8 +260,16 @@ void print_zip_file_list(FILE *pfile, fpos_t *zip_offset)
         return;
     }
 
-    fsetpos(pfile, zip_offset);
-    fseek(pfile, eocdr.centralDirectoryOffset, SEEK_CUR);
+    if(fsetpos(pfile, zip_offset) != 0)
+    {
+        perror("Error while reading zip format\n");
+        return;
+    }
+    if(fseek(pfile, eocdr.centralDirectoryOffset, SEEK_CUR) != 0)
+    {
+        perror("Error while reading zip format\n");
+        return;
+    }
     for (int i = 0; i < eocdr.totalCentralDirectoryRecord; i++)
     {
         cnt = fread(&cdfh, sizeof(cdfh), 1, pfile);
@@ -233,14 +280,22 @@ void print_zip_file_list(FILE *pfile, fpos_t *zip_offset)
 
         strlen = cdfh.filenameLength + cdfh.extraFieldLength + cdfh.fileCommentLength;
         str = malloc(strlen + 1);
-        cnt = fread(str, strlen, 1, pfile);
-        if(cnt != 1)
+        if(str != NULL)
         {
-            perror("Error while reading zip format\n");
+            cnt = fread(str, strlen, 1, pfile);
+            if(cnt != 1)
+            {
+                perror("Error while reading zip format\n");
+            }
+            str[cdfh.filenameLength] = 0;
+            printf("%s\n", str);
+            free(str);
         }
-        str[cdfh.filenameLength] = 0;
-        printf("%s\n", str);
-        free(str);
+        else
+        {
+            perror("Out of memory");
+            break;
+        }
     }
 
     return;
@@ -261,12 +316,25 @@ int main(int argc, char const *argv[])
 
     printf("File for analise \"%s\"\n", argv[1]);
 
+    struct stat sb;
     FILE *pfile = NULL;
+
+    if(stat(argv[1], &sb) == -1)
+    {
+        perror("stat");
+        exit(EXIT_FAILURE);
+    }
+    if((sb.st_mode & S_IFMT) != S_IFREG)
+    {
+        fprintf(stderr, "The \"%s\" is not a regular file\n", argv[1]);
+        exit(EXIT_FAILURE);
+    }
+
     pfile = fopen(argv[1], "rb");
     if(pfile == NULL)
     {
         fprintf(stderr, "Can not open file \"%s\"\n", argv[1]);
-        exit(1);
+        exit(EXIT_FAILURE);
     }
 
     fpos_t zip_offset;

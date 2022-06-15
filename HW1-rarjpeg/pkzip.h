@@ -1,5 +1,8 @@
 #pragma once
 
+#ifndef _PKZIP_H_
+#define _PKZIP_H_
+
 #include <stdint.h>
 
 #pragma pack(push, 2)
@@ -114,3 +117,4 @@ typedef struct
 
 #pragma pack(pop)
 
+#endif // _PKZIP_H_
