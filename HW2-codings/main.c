@@ -10,15 +10,34 @@
 #include <byteswap.h>
 
 #include "version.h"
+#include "tables.h"
+
+
+typedef struct
+{
+    const char *name;
+    uint16_t *table;
+} coding_type;
+
+
+const coding_type coding_name[] = 
+{
+    {"cp-1252", cp_1252},
+    {"koi-8", cp_1252},
+    {"iso-8859-5" cp_1252},
+};
+
 
 void print_usage(const char *prog_name)
 {
     printf("Usage: %s <file to convert> <file encoding>\n"
-           "   file encoding: one of\n"
-           "       \"cp-1252\",\n"
-           "       \"koi-8\",\n"
-           "       \"iso-8859-5\"\n", prog_name);
+           "   file encoding: one of:\n", prog_name);
+    for(size_t i=0; i<(sizeof(coding_name)/sizeof(coding_name[0])); i++)
+    {
+        printf("      \"%s\"\n", coding_name[i].name);
+    }
 }
+
 
 void print_version(const char *prog_name)
 {
@@ -28,10 +47,11 @@ void print_version(const char *prog_name)
         PROJECT_VERSION_PATCH);
 }
 
+
 bool regular_file_check(const char *fname)
 {
     struct stat sb;
-    if(stat(argv[1], &sb) == -1)
+    if(stat(fname, &sb) == -1)
     {
         return false;
     }
@@ -40,6 +60,30 @@ bool regular_file_check(const char *fname)
         return false;
     }
     return true;
+}
+
+
+bool translate_to_stream(FILE *pfile, char char_in, uint16_t *table)
+{
+    int cnt;
+    uint8_t out_buf[6];
+    uint16_t out_val;
+
+    if(char_in < 0x7f)
+    {
+        cnt = fwrite(&char_in, 1, 1, pfile);
+        if(cnt != 1)
+        {
+            perror("Can't write to file");
+            return false;
+        }
+        return true;
+    }
+
+    out_val = table[(char_in - 0x7f)];
+    out_buf[0] = 0xd0;
+    
+    return false;
 }
 
 
