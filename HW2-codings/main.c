@@ -16,22 +16,23 @@
 typedef struct
 {
     const char *name;
-    uint16_t *table;
+    const uint16_t *table;
 } coding_type;
 
 
 const coding_type coding_name[] = 
 {
-    {"cp-1252", cp_1252},
-    {"koi-8", cp_1252},
-    {"iso-8859-5" cp_1252},
+    {"cp-1251", cp_1251},
+    {"koi8", koi8},
+    {"iso-8859-5", iso_8859_5},
 };
 
+#define CODINGS (sizeof(coding_name)/sizeof(coding_name[0]))
 
 void print_usage(const char *prog_name)
 {
-    printf("Usage: %s <file to convert> <file encoding>\n"
-           "   file encoding: one of:\n", prog_name);
+    printf("Usage: %s <input file> <file encoding> <output file>\n"
+           "   file encoding is one of:\n", prog_name);
     for(size_t i=0; i<(sizeof(coding_name)/sizeof(coding_name[0])); i++)
     {
         printf("      \"%s\"\n", coding_name[i].name);
@@ -63,13 +64,16 @@ bool regular_file_check(const char *fname)
 }
 
 
-bool translate_to_stream(FILE *pfile, char char_in, uint16_t *table)
+bool translate_to_stream(FILE *pfile, unsigned char char_in, const uint16_t *table)
 {
     int cnt;
-    uint8_t out_buf[6];
+    // Здесь, в общем виде, должен быть буфер на 6 байт,
+    // но мы ограничиваемся конкретными таблицами ASCII,
+    // поэтому 2 байта хватает.
+    uint8_t out_buf[2];
     uint16_t out_val;
 
-    if(char_in < 0x7f)
+    if(char_in < 0x80)
     {
         cnt = fwrite(&char_in, 1, 1, pfile);
         if(cnt != 1)
@@ -80,15 +84,46 @@ bool translate_to_stream(FILE *pfile, char char_in, uint16_t *table)
         return true;
     }
 
-    out_val = table[(char_in - 0x7f)];
-    out_buf[0] = 0xd0;
+    out_val = table[(char_in - 0x80)];
+    out_buf[0] = 0xd0 | ((out_val >> 6) & 0x1f);
+    out_buf[1] = 0x80 | (out_val & 0x3f);
     
-    return false;
+    cnt = fwrite(&out_buf, sizeof(out_buf), 1, pfile);
+    if(cnt != 1)
+    {
+        perror("Can't write to file");
+        return false;
+    }
+
+    return true;
+}
+
+
+bool translate(FILE *pfin, const uint16_t *table, FILE *pfout)
+{
+    bool retval = false;
+    uint8_t buf_8;
+
+    while(fread(&buf_8, sizeof(buf_8), 1, pfin))
+    {
+        retval = translate_to_stream(pfout, buf_8, table);
+        if(retval == false)
+        {
+            break;
+        }
+    }
+    return retval;
 }
 
 
 int main(int argc, char const *argv[])
 {
+    const uint16_t *in_table = NULL;
+    size_t coding_iter;
+    int retval = EXIT_FAILURE;
+    FILE *pfin = NULL;
+    FILE *pfout = NULL;
+
     if((argc > 1) && (strcmp(argv[1], "--version") == 0))
     {
         print_version(argv[0]);
@@ -100,25 +135,53 @@ int main(int argc, char const *argv[])
         return 0;
     }
 
-    int ret_val = 1;
-    FILE *pfile = NULL;
+    for(coding_iter=0; coding_iter<CODINGS; coding_iter++)
+    {
+        if(strcmp(argv[2], coding_name[coding_iter].name) == 0)
+        {
+            in_table = coding_name[coding_iter].table;
+            break;
+        }
+    }
+    if(coding_iter == CODINGS)
+    {
+        fprintf(stderr, "Translate from coding \"%s\" not implemented\n", argv[2]);
+        print_usage(argv[0]);
+        exit(EXIT_FAILURE);
+    }
 
     if(!regular_file_check(argv[1]))
     {
         fprintf(stderr, "The \"%s\" is not a regular file\n", argv[1]);
         exit(EXIT_FAILURE);
     }
-
-    pfile = fopen(argv[1], "rb");
-    if(pfile == NULL)
+    pfin = fopen(argv[1], "rb");
+    if(pfin == NULL)
     {
         fprintf(stderr, "Can not open file \"%s\"\n", argv[1]);
         exit(EXIT_FAILURE);
     }
+    pfout = fopen(argv[3], "wb");
+    if(pfout == NULL)
+    {
+        fprintf(stderr, "Can not open file \"%s\" to write\n", argv[1]);
+        if(pfin)
+            fclose(pfin);
+        exit(EXIT_FAILURE);
+    }
 
-    
+    if(!translate(pfin, in_table, pfout))
+    {
+        fprintf(stderr, "Translation is not complete. Errors have occurred.\n");
+    }
+    else
+    {
+        fprintf(stderr, "Translation complete.\n");
+        retval = EXIT_SUCCESS;
+    }
 
-    fclose(pfile);
+    fclose(pfin);
+    fclose(pfout);
 
-    return ret_val;
+    return retval;
 }
