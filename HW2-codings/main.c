@@ -49,6 +49,13 @@ void print_version(const char *prog_name)
 }
 
 
+/**
+ * @brief      Проверка типа входного файла
+ *
+ * @param[in]  fname - имя файла
+ *
+ * @return true - путь указывает на обычный файл
+ */
 bool regular_file_check(const char *fname)
 {
     struct stat sb;
@@ -64,7 +71,17 @@ bool regular_file_check(const char *fname)
 }
 
 
-bool translate_to_stream(FILE *pfile, unsigned char char_in, const uint16_t *table)
+/**
+ * Перевод одного ASCII символа в unicode.
+ * Результат записывается в файл.
+ *
+ * @param      pfile    файл для записи результата
+ * @param[in]  char_in  символ для перевода
+ * @param[in]  table    таблица соответствия
+ *
+ * @return     при успешном переводе и успешной записи в файл возвращает true
+ */
+bool translate_to_file(FILE *pfile, unsigned char char_in, const uint16_t *table)
 {
     int cnt;
     // Здесь, в общем виде, должен быть буфер на 6 байт,
@@ -84,7 +101,7 @@ bool translate_to_stream(FILE *pfile, unsigned char char_in, const uint16_t *tab
         return true;
     }
 
-    out_val = table[(char_in - 0x80)];
+    out_val = table[char_in - 0x80];
     out_buf[0] = 0xd0 | ((out_val >> 6) & 0x1f);
     out_buf[1] = 0x80 | (out_val & 0x3f);
     
@@ -99,6 +116,16 @@ bool translate_to_stream(FILE *pfile, unsigned char char_in, const uint16_t *tab
 }
 
 
+/**
+ * Перевод входного файла по таблице в unicode,
+ * и запись результата в выходной файл
+ *
+ * @param      pfin   входной файл
+ * @param[in]  table  таблица перевода
+ * @param      pfout  выходной файл
+ *
+ * @return     при успешно переводе возвращает true
+ */
 bool translate(FILE *pfin, const uint16_t *table, FILE *pfout)
 {
     bool retval = false;
@@ -106,7 +133,7 @@ bool translate(FILE *pfin, const uint16_t *table, FILE *pfout)
 
     while(fread(&buf_8, sizeof(buf_8), 1, pfin))
     {
-        retval = translate_to_stream(pfout, buf_8, table);
+        retval = translate_to_file(pfout, buf_8, table);
         if(retval == false)
         {
             break;
@@ -124,17 +151,20 @@ int main(int argc, char const *argv[])
     FILE *pfin = NULL;
     FILE *pfout = NULL;
 
+    // Проверка аргументов командной строки
     if((argc > 1) && (strcmp(argv[1], "--version") == 0))
     {
         print_version(argv[0]);
-        return 0;
+        return EXIT_SUCCESS;
     }
     if(argc < 3)
     {
+        fprintf(stderr, "Too few parameters\n", argv[2]);
         print_usage(argv[0]);
-        return 0;
+        exit(EXIT_FAILURE);
     }
 
+    // Поиск таблицы перевода
     for(coding_iter=0; coding_iter<CODINGS; coding_iter++)
     {
         if(strcmp(argv[2], coding_name[coding_iter].name) == 0)
@@ -150,6 +180,7 @@ int main(int argc, char const *argv[])
         exit(EXIT_FAILURE);
     }
 
+    // Открытие входного и выходного файлов
     if(!regular_file_check(argv[1]))
     {
         fprintf(stderr, "The \"%s\" is not a regular file\n", argv[1]);
@@ -170,6 +201,7 @@ int main(int argc, char const *argv[])
         exit(EXIT_FAILURE);
     }
 
+    // Перевод
     if(!translate(pfin, in_table, pfout))
     {
         fprintf(stderr, "Translation is not complete. Errors have occurred.\n");
