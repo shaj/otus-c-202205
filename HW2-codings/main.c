@@ -84,10 +84,8 @@ bool regular_file_check(const char *fname)
 bool translate_to_file(FILE *pfile, unsigned char char_in, const uint16_t *table)
 {
     int cnt;
-    // Здесь, в общем виде, должен быть буфер на 6 байт,
-    // но мы ограничиваемся конкретными таблицами ASCII,
-    // поэтому 2 байта хватает.
-    uint8_t out_buf[2];
+    int length;
+    uint8_t out_buf[3];
     uint16_t out_val;
 
     if(char_in < 0x80)
@@ -102,10 +100,21 @@ bool translate_to_file(FILE *pfile, unsigned char char_in, const uint16_t *table
     }
 
     out_val = table[char_in - 0x80];
-    out_buf[0] = 0xd0 | ((out_val >> 6) & 0x1f);
-    out_buf[1] = 0x80 | (out_val & 0x3f);
-    
-    cnt = fwrite(&out_buf, sizeof(out_buf), 1, pfile);
+    if(out_val & 0xf800)
+    {
+        out_buf[0] = 0xe0 | ((out_val >> 12) & 0x0f);
+        out_buf[1] = 0x80 | ((out_val >> 6) & 0x3f);
+        out_buf[2] = 0x80 | (out_val & 0x3f);
+        length = 3;
+    }
+    else
+    {
+        out_buf[0] = 0xc0 | ((out_val >> 6) & 0x1f);
+        out_buf[1] = 0x80 | (out_val & 0x3f);
+        length = 2;
+    }
+
+    cnt = fwrite(&out_buf, length, 1, pfile);
     if(cnt != 1)
     {
         perror("Can't write to file");
@@ -157,9 +166,9 @@ int main(int argc, char const *argv[])
         print_version(argv[0]);
         return EXIT_SUCCESS;
     }
-    if(argc < 3)
+    if(argc < 4)
     {
-        fprintf(stderr, "Too few parameters\n", argv[2]);
+        fprintf(stderr, "\nToo few parameters\n\n");
         print_usage(argv[0]);
         exit(EXIT_FAILURE);
     }
