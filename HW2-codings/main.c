@@ -204,7 +204,7 @@ int main(int argc, char const *argv[])
     pfout = fopen(argv[3], "wb");
     if(pfout == NULL)
     {
-        fprintf(stderr, "Can not open file \"%s\" to write\n", argv[1]);
+        fprintf(stderr, "Can not open file \"%s\" to write\n", argv[3]);
         if(pfin)
             fclose(pfin);
         exit(EXIT_FAILURE);
