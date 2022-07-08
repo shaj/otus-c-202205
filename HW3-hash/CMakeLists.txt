@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.4)
 
-project(rarjpeg VERSION 0.0.1 LANGUAGES C)
+project(otuswc VERSION 0.0.1 LANGUAGES C)
 
 list(APPEND CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/cmake")
 include(CodeFormat)
