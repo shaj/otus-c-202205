@@ -7,10 +7,8 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 
-#include <byteswap.h>
-
 #include "version.h"
-#include "tables.h"
+#include "hashtable.h"
 
 
 void print_usage(const char *prog_name)
@@ -53,7 +51,7 @@ bool regular_file_check(const char *fname)
 int main(int argc, char const *argv[])
 {
     int retval = EXIT_FAILURE;
-    FILE *pfout = NULL;
+    FILE *pfin = NULL;
 
     // Проверка аргументов командной строки
     if((argc > 1) && (strcmp(argv[1], "--version") == 0))
