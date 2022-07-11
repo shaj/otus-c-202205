@@ -1,8 +1,8 @@
 
 #pragma once
 
-#include <stdio.h>
 #include <stdbool.h>
+#include <stdio.h>
 
 #include "hashtable.h"
 
@@ -15,4 +15,7 @@ struct WordDescr
     struct WordDescr *next;
 };
 
-bool read_words(FILE *hfile, HashTable *table);
+bool read_words(FILE *hfile, HashTable table);
+
+void print_words_array(HashTable table);
+void hashtable_delete(HashTable table);

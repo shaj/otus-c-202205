@@ -1,58 +1,32 @@
 
 #include <stdbool.h>
 #include <stdlib.h>
+#include <string.h>
 
 #include "hashtable.h"
+#include "powtable.h"
 
-#define POW_SIZE 256
+static const unsigned long long p_pow[POW_SIZE];
 
-static unsigned long long p_pow[POW_SIZE];
-
-size_t get_str_hash(const char *buf)
+unsigned long long get_str_hash(const char *buf)
 {
-    for (size_t i = 1; i < POW_SIZE; ++i)
+    unsigned long long hash = 0;
+    int j = 0;
+    for (const char *pc = buf; *pc != '\0'; pc++)
     {
-        p_pow[i] = p_pow[i - 1] * p;
+        hash += (*pc - 'a' + 1) * p_pow[j % POW_SIZE];
+        j++;
     }
-
-    for (int i = 0; i < n; ++i)
-    {
-        unsigned long long hash = 0;
-        for (size_t j = 0; j < s[i].length(); ++j)
-            hash += (s[i][j] - 'a' + 1) * p_pow[j];
-        hashes[i] = make_pair(hash, i);
-    }
-
-    return 0;
+    return hash;
 }
 
 bool hashtable_init(HashTable table)
 {
-
-    memset(table, 0, sizeof(table));
+    memset(table, 0, sizeof(struct HashRow) * HASH_TABLE_SIZE);
     return false;
 }
 
-bool hashtable_delete(HashTable table)
+void *hashtable_get(HashTable table, unsigned long long hash)
 {
-    // Not implemented yet
-    return false;
-}
-
-bool hashtable_add(HashTable table, void *data)
-{
-    // Not implemented yet
-    return false;
-}
-
-bool hashtable_remove(HashTable table, void *data)
-{
-    // Not implemented yet
-    return false;
-}
-
-void *hashtable_get(HashTable table, size_t hash)
-{
-    // Not implemented yet
-    return NULL;
+    return &(table[hash % HASH_TABLE_SIZE].data);
 }

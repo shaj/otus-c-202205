@@ -17,5 +17,5 @@ target_include_directories(${PROJECT_NAME} PUBLIC "${PROJECT_BINARY_DIR}")
 
 configure_file("${PROJECT_SOURCE_DIR}/src/version.h.in" "${PROJECT_BINARY_DIR}/version.h")
 
-# configure_file(${CMAKE_SOURCE_DIR}/non-zipjpeg.jpg ${CMAKE_BINARY_DIR}/non-zipjpeg.jpg COPYONLY)
+configure_file(${CMAKE_SOURCE_DIR}/test/utf-8.txt ${CMAKE_BINARY_DIR}/utf-8.txt COPYONLY)
 # configure_file(${CMAKE_SOURCE_DIR}/zipjpeg.jpg ${CMAKE_BINARY_DIR}/zipjpeg.jpg COPYONLY)
