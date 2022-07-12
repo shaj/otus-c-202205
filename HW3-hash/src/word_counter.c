@@ -4,17 +4,33 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/stat.h>
+#include <sys/types.h>
 
 #include "hashtable.h"
 #include "word_counter.h"
 
+/**
+ * @brief      Adds a character to buffer.
+ *
+ * @param[in]  in_char  In character
+ * @param      pc       { parameter_description }
+ */
 static inline void add_char_to_buf(int in_char, char **pc)
 {
     **pc = (char)in_char;
     (*pc)++;
 }
 
-void add_word(HashTable table, char *buf, size_t len)
+
+/**
+ * @brief      Добавление с лова в таблицу
+ *
+ * @param[in]  table  Таблица, куда добавлять
+ * @param      buf    Указатель на null-terminated слово
+ * @param[in]  len    Длина слова. (Для скорости. Чтобы лишний раз не вычислять)
+ */
+void add_word(HashTable table, const char *buf, size_t len)
 {
     struct WordDescr **word_descr;
 
@@ -61,17 +77,53 @@ void add_word(HashTable table, char *buf, size_t len)
     }
 }
 
-bool read_words(FILE *hfile, HashTable table)
+
+/**
+ * @brief      Проверка типа входного файла
+ *
+ * @param[in]  fname - имя файла
+ *
+ * @return true - путь указывает на обычный файл
+ */
+bool regular_file_check(const char *fname)
 {
-    int cnt;
+    struct stat sb;
+    if (stat(fname, &sb) == -1)
+    {
+        return false;
+    }
+    if ((sb.st_mode & S_IFMT) != S_IFREG)
+    {
+        return false;
+    }
+    return true;
+}
+
+/**
+ * @brief      Чтение слов из файла
+ *
+ * @param[in]  fname  Имя файла
+ * @param[in]  table  Хэш-таблица, куда читать
+ *
+ * @return     true - файл успешно прочитан
+ */
+bool read_words(const char *fname, HashTable table)
+{
     char buf[BUF_SIZE];
     char *pc;
     int in_char;
+    FILE *hfile;
 
-    cnt = fseek(hfile, 0, SEEK_SET);
-    if (cnt != 0)
+    // Открытие входного файлов
+    if (!regular_file_check(fname))
     {
-        perror("Error while read data");
+        fprintf(stderr, "The \"%s\" is not a regular file\n", fname);
+        return false;
+    }
+    hfile = fopen(fname, "r");
+    if (hfile == NULL)
+    {
+        fprintf(stderr, "Can not open file \"%s\"\n", fname);
         return false;
     }
 
@@ -106,9 +158,17 @@ bool read_words(FILE *hfile, HashTable table)
             pc = buf;
         }
     } while (1);
+
+    fclose(hfile);
     return true;
 }
 
+
+/**
+ * @brief      Вывод в консоль результата
+ *
+ * @param[in]  table  The table
+ */
 void print_words_array(HashTable table)
 {
     struct WordDescr *word_descr;
@@ -131,21 +191,48 @@ void print_words_array(HashTable table)
     }
     printf("\n\n");
 #endif // DEBUG
+
+    int wc = 0;
+    int chain = 0;
+    int max_chain = 0;
+    int empty_cells = 0;
+
     for (int i = 0; i < HASH_TABLE_SIZE; i++)
     {
         if (table[i].data != NULL)
         {
+            chain = 0;
             word_descr = (struct WordDescr *)table[i].data;
             while (word_descr != NULL)
             {
                 printf("\"%s\" %ld\n", word_descr->word, word_descr->counter);
                 word_descr = word_descr->next;
+                chain++;
+                wc++;
+            }
+            if(max_chain < chain)
+            {
+                max_chain = chain;
             }
         }
+        else
+        {
+            empty_cells++;
+        }
     }
+    printf("\nВсего слов: %d\n", wc);
+    printf("Пустых ячеек: %d из %d\n", empty_cells, HASH_TABLE_SIZE);
+    printf("Максимальная длина цепочки: %d\n", max_chain);
+
     return;
 }
 
+
+/**
+ * @brief      Удаление цепочки для одной ячейки таблицы
+ *
+ * @param      word_descr  The word description
+ */
 void free_word_descr(struct WordDescr *word_descr)
 {
     if (word_descr->next != NULL)
@@ -155,6 +242,12 @@ void free_word_descr(struct WordDescr *word_descr)
     free(word_descr);
 }
 
+
+/**
+ * @brief      Удаоение таблицы
+ *
+ * @param[in]  table  The table
+ */
 void hashtable_delete(HashTable table)
 {
     for (int i = 0; i < HASH_TABLE_SIZE; i++)

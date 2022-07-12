@@ -22,31 +22,8 @@ void print_version(const char *prog_name)
            PROJECT_VERSION_MINOR, PROJECT_VERSION_PATCH);
 }
 
-/**
- * @brief      Проверка типа входного файла
- *
- * @param[in]  fname - имя файла
- *
- * @return true - путь указывает на обычный файл
- */
-bool regular_file_check(const char *fname)
-{
-    struct stat sb;
-    if (stat(fname, &sb) == -1)
-    {
-        return false;
-    }
-    if ((sb.st_mode & S_IFMT) != S_IFREG)
-    {
-        return false;
-    }
-    return true;
-}
-
 int main(int argc, char const *argv[])
 {
-    FILE *pfin = NULL;
-
     // Проверка аргументов командной строки
     if ((argc > 1) && (strcmp(argv[1], "--version") == 0))
     {
@@ -60,28 +37,16 @@ int main(int argc, char const *argv[])
         exit(EXIT_FAILURE);
     }
 
-    // Открытие входного файлов
-    if (!regular_file_check(argv[1]))
-    {
-        fprintf(stderr, "The \"%s\" is not a regular file\n", argv[1]);
-        exit(EXIT_FAILURE);
-    }
-    pfin = fopen(argv[1], "rb");
-    if (pfin == NULL)
-    {
-        fprintf(stderr, "Can not open file \"%s\"\n", argv[1]);
-        exit(EXIT_FAILURE);
-    }
-
+    // Инициализация таблицы
     HashTable words_array;
     hashtable_init(words_array);
+
     // Анализ файла (подсчет слов)
-    if (!read_words(pfin, words_array))
+    if (!read_words(argv[1], words_array))
     {
         fprintf(stderr, "Can not read words from file \"%s\"\n", argv[1]);
         exit(EXIT_FAILURE);
     }
-    fclose(pfin);
 
     // Печать результата
     print_words_array(words_array);

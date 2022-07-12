@@ -8,6 +8,14 @@
 
 static const unsigned long long p_pow[POW_SIZE];
 
+
+/**
+ * @brief      Вычисление хэша для строки
+ *
+ * @param[in]  buf   The buffer
+ *
+ * @return     The hash.
+ */
 unsigned long long get_str_hash(const char *buf)
 {
     unsigned long long hash = 0;
@@ -20,12 +28,30 @@ unsigned long long get_str_hash(const char *buf)
     return hash;
 }
 
+/**
+ * @brief      Инициализация таблицы
+ *
+ * @param[in]  table  The table
+ *
+ * @return     Always true
+ */
 bool hashtable_init(HashTable table)
 {
     memset(table, 0, sizeof(struct HashRow) * HASH_TABLE_SIZE);
-    return false;
+    return true;
 }
 
+
+/**
+ * @brief      Получение значения из таблицы дл яопределенного хэша
+ * 
+ * (Поиск в таблице по хэшу)
+ *
+ * @param[in]  table  The table
+ * @param[in]  hash   The hash
+ *
+ * @return     Указатель на данные
+ */
 void *hashtable_get(HashTable table, unsigned long long hash)
 {
     return &(table[hash % HASH_TABLE_SIZE].data);
