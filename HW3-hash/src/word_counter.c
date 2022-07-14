@@ -14,7 +14,7 @@
  * @brief      Adds a character to buffer.
  *
  * @param[in]  in_char  In character
- * @param      pc       { parameter_description }
+ * @param      pc       Двойной указательна строку, куда добавлять букву.
  */
 static inline void add_char_to_buf(int in_char, char **pc)
 {
@@ -22,21 +22,50 @@ static inline void add_char_to_buf(int in_char, char **pc)
     (*pc)++;
 }
 
+/**
+ * Создание структуры для хранения слова
+ * и добавление туда слова.
+ *
+ * @param[in]  buf   Null terminated string
+ *
+ * @return     true - структура создана и слово добавлено
+ */
+struct WordDescr * create_word_descr(const char *buf)
+{
+    struct WordDescr *wd = (struct WordDescr *)malloc(sizeof(struct WordDescr));
+    if(wd == NULL)
+    {
+        fprintf(stderr, "ERROR. Out of memory\n");
+        return NULL;
+    }
+    wd->word = (char *)malloc(strlen(buf) + 1);
+    if(wd->word == NULL)
+    {
+        free(wd);
+        fprintf(stderr, "ERROR. Out of memory\n");
+        return NULL;
+    }
+    strcpy(wd->word, buf);
+    wd->counter = 1;
+    wd->next = NULL;
+    return wd;
+}
 
 /**
  * @brief      Добавление с лова в таблицу
  *
  * @param[in]  table  Таблица, куда добавлять
  * @param      buf    Указатель на null-terminated слово
- * @param[in]  len    Длина слова. (Для скорости. Чтобы лишний раз не вычислять)
+ * 
+ * @return     true - слово успешно добавлено
  */
-void add_word(HashTable table, const char *buf, size_t len)
+bool add_word(HashTable table, const char *buf)
 {
     struct WordDescr **word_descr;
 
-    if ((buf[0] == '\0') || (len == 0))
+    if (buf[0] == '\0')
     {
-        return;
+        return true; // Ошибки нет. Просто пустую строку не добавляем.
     }
 
     unsigned long long hash = get_str_hash(buf);
@@ -54,11 +83,12 @@ void add_word(HashTable table, const char *buf, size_t len)
 
     if ((*word_descr) == NULL)
     {
-        *word_descr = (struct WordDescr *)malloc(sizeof(struct WordDescr));
-        (*word_descr)->word = (char *)malloc(len + 1);
-        strcpy((*word_descr)->word, buf);
-        (*word_descr)->counter = 1;
-        (*word_descr)->next = NULL;
+        *word_descr = create_word_descr(buf);
+        if(*word_descr == NULL)
+        {
+            fprintf(stderr, "Can not add word to list.\n");
+            return false;
+        }
     }
     else
     {
@@ -68,13 +98,15 @@ void add_word(HashTable table, const char *buf, size_t len)
         }
         else
         {
-            *word_descr = (struct WordDescr *)malloc(sizeof(struct WordDescr));
-            (*word_descr)->word = (char *)malloc(len + 1);
-            strcpy((*word_descr)->word, buf);
-            (*word_descr)->counter = 1;
-            (*word_descr)->next = NULL;
+            *word_descr = create_word_descr(buf);
+            if(*word_descr == NULL)
+            {
+                fprintf(stderr, "Can not add word to list.\n");
+                return false;
+            }
         }
     }
+    return true;
 }
 
 
@@ -105,7 +137,8 @@ bool regular_file_check(const char *fname)
  * @param[in]  fname  Имя файла
  * @param[in]  table  Хэш-таблица, куда читать
  *
- * @return     true - файл успешно прочитан
+ * @return     true  - файл успешно прочитан
+ *             false - при чтении файла были ошибки
  */
 bool read_words(const char *fname, HashTable table)
 {
@@ -128,20 +161,28 @@ bool read_words(const char *fname, HashTable table)
     }
 
     pc = buf;
+    bool retval = true;
     do
     {
         in_char = fgetc(hfile);
         if (feof(hfile))
         {
             *pc = '\0';
-            add_word(table, buf, (pc - buf));
+            if(!add_word(table, buf))
+            {
+                retval = false;
+            }
             break;
         }
         if (pc >= (buf + BUF_SIZE))
         {
-            *pc = '\0';
-            add_word(table, buf, (pc - buf));
             fprintf(stderr, "Too long word. More than %d bytes.", BUF_SIZE);
+            *pc = '\0';
+            if(!add_word(table, buf))
+            {
+                retval = false;
+                break;
+            }
         }
         if (in_char > 0x7f)
         {
@@ -154,13 +195,17 @@ bool read_words(const char *fname, HashTable table)
         else
         {
             *pc = '\0';
-            add_word(table, buf, (pc - buf));
+            if(!add_word(table, buf))
+            {
+                retval = false;
+                break;
+            }
             pc = buf;
         }
     } while (1);
 
     fclose(hfile);
-    return true;
+    return retval;
 }
 
 
