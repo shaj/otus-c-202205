@@ -30,16 +30,16 @@ static inline void add_char_to_buf(int in_char, char **pc)
  *
  * @return     true - структура создана и слово добавлено
  */
-struct WordDescr * create_word_descr(const char *buf)
+struct WordDescr *create_word_descr(const char *buf)
 {
     struct WordDescr *wd = (struct WordDescr *)malloc(sizeof(struct WordDescr));
-    if(wd == NULL)
+    if (wd == NULL)
     {
         fprintf(stderr, "ERROR. Out of memory\n");
         return NULL;
     }
     wd->word = (char *)malloc(strlen(buf) + 1);
-    if(wd->word == NULL)
+    if (wd->word == NULL)
     {
         free(wd);
         fprintf(stderr, "ERROR. Out of memory\n");
@@ -56,7 +56,7 @@ struct WordDescr * create_word_descr(const char *buf)
  *
  * @param[in]  table  Таблица, куда добавлять
  * @param      buf    Указатель на null-terminated слово
- * 
+ *
  * @return     true - слово успешно добавлено
  */
 bool add_word(HashTable table, const char *buf)
@@ -84,7 +84,7 @@ bool add_word(HashTable table, const char *buf)
     if ((*word_descr) == NULL)
     {
         *word_descr = create_word_descr(buf);
-        if(*word_descr == NULL)
+        if (*word_descr == NULL)
         {
             fprintf(stderr, "Can not add word to list.\n");
             return false;
@@ -99,7 +99,7 @@ bool add_word(HashTable table, const char *buf)
         else
         {
             *word_descr = create_word_descr(buf);
-            if(*word_descr == NULL)
+            if (*word_descr == NULL)
             {
                 fprintf(stderr, "Can not add word to list.\n");
                 return false;
@@ -108,7 +108,6 @@ bool add_word(HashTable table, const char *buf)
     }
     return true;
 }
-
 
 /**
  * @brief      Проверка типа входного файла
@@ -168,7 +167,7 @@ bool read_words(const char *fname, HashTable table)
         if (feof(hfile))
         {
             *pc = '\0';
-            if(!add_word(table, buf))
+            if (!add_word(table, buf))
             {
                 retval = false;
             }
@@ -178,7 +177,7 @@ bool read_words(const char *fname, HashTable table)
         {
             fprintf(stderr, "Too long word. More than %d bytes.", BUF_SIZE);
             *pc = '\0';
-            if(!add_word(table, buf))
+            if (!add_word(table, buf))
             {
                 retval = false;
                 break;
@@ -195,7 +194,7 @@ bool read_words(const char *fname, HashTable table)
         else
         {
             *pc = '\0';
-            if(!add_word(table, buf))
+            if (!add_word(table, buf))
             {
                 retval = false;
                 break;
@@ -207,7 +206,6 @@ bool read_words(const char *fname, HashTable table)
     fclose(hfile);
     return retval;
 }
-
 
 /**
  * @brief      Вывод в консоль результата
@@ -255,7 +253,7 @@ void print_words_array(HashTable table)
                 chain++;
                 wc++;
             }
-            if(max_chain < chain)
+            if (max_chain < chain)
             {
                 max_chain = chain;
             }
@@ -272,7 +270,6 @@ void print_words_array(HashTable table)
     return;
 }
 
-
 /**
  * @brief      Удаление цепочки для одной ячейки таблицы
  *
@@ -286,7 +283,6 @@ void free_word_descr(struct WordDescr *word_descr)
         free(word_descr->word);
     free(word_descr);
 }
-
 
 /**
  * @brief      Удаоение таблицы

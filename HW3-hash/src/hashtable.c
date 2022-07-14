@@ -8,7 +8,6 @@
 
 static const unsigned long long p_pow[POW_SIZE];
 
-
 /**
  * @brief      Вычисление хэша для строки
  *
@@ -41,10 +40,9 @@ bool hashtable_init(HashTable table)
     return true;
 }
 
-
 /**
  * @brief      Получение значения из таблицы дл яопределенного хэша
- * 
+ *
  * (Поиск в таблице по хэшу)
  *
  * @param[in]  table  The table
