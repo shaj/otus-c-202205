@@ -7,9 +7,12 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 
+#include <cjson/cJSON.h>
 #include <curl/curl.h>
 
 #include "version.h"
+#include "getter.h"
+#include "parser.h"
 
 void print_usage(const char *prog_name)
 {
@@ -101,8 +104,22 @@ int main(int argc, char const *argv[])
         printf("%lu bytes retrieved\n", (unsigned long)chunk.size);
     }
 
+    printf("\n%s\n", chunk.memory);
+    free(chunk.memory);
+
     curl_easy_cleanup(curl_handle);
     curl_global_cleanup();
+
+    char * str_buf = (char *) malloc(64);
+    strcpy(str_buf, "{\"param1\":\"1\",\"param2\":\"2\"}");
+    cJSON *json = cJSON_Parse(str_buf);
+    free(str_buf);
+
+    char *out_str = cJSON_Print(json);
+    printf("\ncJSON\n%s\n", out_str);
+    free(out_str);
+
+    cJSON_Delete(json);
 
     return EXIT_SUCCESS;
 }
