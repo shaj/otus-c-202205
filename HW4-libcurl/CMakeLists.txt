@@ -6,7 +6,7 @@ list(APPEND CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/cmake")
 include(CodeFormat)
 
 find_package(CURL REQUIRED)
-find_package(cJSON REQUIRED)
+# find_package(cJSON REQUIRED)
 
 add_executable(${PROJECT_NAME}
     src/main.c
@@ -19,11 +19,12 @@ target_compile_options(${PROJECT_NAME} PUBLIC -Wall -Wextra -Wpedantic)
 target_include_directories(${PROJECT_NAME} PUBLIC "${PROJECT_BINARY_DIR}")
 target_include_directories(${PROJECT_NAME} PUBLIC 
     ${CURL_INCLUDE_DIRS}
-    ${CJSON_INCLUDE_DIRS}
+    # ${CJSON_INCLUDE_DIRS}
 )
 target_link_libraries(${PROJECT_NAME}
     ${CURL_LIBRARIES}
-    ${CJSON_LIBRARIES}
+    # ${CJSON_LIBRARIES}
+    cjson
 )
 
 

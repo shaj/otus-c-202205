@@ -25,36 +25,12 @@ void print_version(const char *prog_name)
            PROJECT_VERSION_MINOR, PROJECT_VERSION_PATCH);
 }
 
-struct MemoryStruct
-{
-    char *memory;
-    size_t size;
-};
 
-static size_t WriteMemoryCallback(void *contents, size_t size, size_t nmemb,
-                                  void *userp)
-{
-    size_t realsize = size * nmemb;
-    struct MemoryStruct *mem = (struct MemoryStruct *)userp;
-
-    char *ptr = realloc(mem->memory, mem->size + realsize + 1);
-    if (!ptr)
-    {
-        /* out of memory! */
-        printf("not enough memory (realloc returned NULL)\n");
-        return 0;
-    }
-
-    mem->memory = ptr;
-    memcpy(&(mem->memory[mem->size]), contents, realsize);
-    mem->size += realsize;
-    mem->memory[mem->size] = 0;
-
-    return realsize;
-}
 
 int main(int argc, char const *argv[])
 {
+    char uri[1024];
+
     // Проверка аргументов командной строки
     if ((argc > 1) && (strcmp(argv[1], "--version") == 0))
     {
@@ -65,61 +41,43 @@ int main(int argc, char const *argv[])
     {
         fprintf(stderr, "\nToo few parameters\n\n");
         print_usage(argv[0]);
-        exit(EXIT_FAILURE);
-    }
-
-    CURL *curl_handle;
-    CURLcode res;
-
-    struct MemoryStruct chunk;
-
-    chunk.memory = malloc(1); /* will be grown as needed by the realloc above */
-    chunk.size = 0;           /* no data at this point */
-
-    curl_global_init(CURL_GLOBAL_ALL);
-    curl_handle = curl_easy_init();
-
-    curl_easy_setopt(curl_handle, CURLOPT_URL, "https://www.example.com/");
-    curl_easy_setopt(curl_handle, CURLOPT_WRITEFUNCTION, WriteMemoryCallback);
-    curl_easy_setopt(curl_handle, CURLOPT_WRITEDATA, (void *)&chunk);
-    curl_easy_setopt(curl_handle, CURLOPT_USERAGENT, "libcurl-agent/1.0");
-
-    res = curl_easy_perform(curl_handle);
-
-    /* check for errors */
-    if (res != CURLE_OK)
-    {
-        fprintf(stderr, "curl_easy_perform() failed: %s\n",
-                curl_easy_strerror(res));
+        strcpy(uri, "https://wttr.in/Moscow?format=j1");
+        // exit(EXIT_FAILURE);
     }
     else
     {
-        /*
-         * Now, our chunk.memory points to a memory block that is chunk.size
-         * bytes big and contains the remote file.
-         *
-         * Do something nice with it!
-         */
-
-        printf("%lu bytes retrieved\n", (unsigned long)chunk.size);
+        if(strlen(argv[1]) >= (sizeof(uri)-2))
+        {
+            strncpy(uri, argv[1], (sizeof(uri)-2));
+            uri[(sizeof(uri)-1)] = '\0';
+        }
+        else
+        {
+            strcpy(uri, argv[1]);
+        }
+        
     }
 
-    printf("\n%s\n", chunk.memory);
-    free(chunk.memory);
+    // Выполнение запроса
+    char *resp = do_get(uri);
+    if(resp == NULL)
+    {
+        fprintf(stderr, "Error while do request \"%s\"\n", argv[1]);
+        return EXIT_FAILURE;
+    }
 
-    curl_easy_cleanup(curl_handle);
-    curl_global_cleanup();
+    // Разбор принятых данных
+    struct WeatherData *w_data = parse_data(resp);
+    free(resp);
+    if(w_data == NULL)
+    {
+        fprintf(stderr, "Error while do request \"%s\"\n", argv[1]);
+        return EXIT_FAILURE;
+    }
 
-    char * str_buf = (char *) malloc(64);
-    strcpy(str_buf, "{\"param1\":\"1\",\"param2\":\"2\"}");
-    cJSON *json = cJSON_Parse(str_buf);
-    free(str_buf);
-
-    char *out_str = cJSON_Print(json);
-    printf("\ncJSON\n%s\n", out_str);
-    free(out_str);
-
-    cJSON_Delete(json);
+    // Печать структуры WeatherData
+    print_weather_data(w_data);
+    free_weather_data(w_data);
 
     return EXIT_SUCCESS;
 }
