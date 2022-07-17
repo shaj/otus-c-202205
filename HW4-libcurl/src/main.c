@@ -10,13 +10,22 @@
 #include <cjson/cJSON.h>
 #include <curl/curl.h>
 
-#include "version.h"
 #include "getter.h"
 #include "parser.h"
+#include "version.h"
 
 void print_usage(const char *prog_name)
 {
-    printf("Usage: %s <input file>\n", prog_name);
+    printf("Usage: %s <location>\n", prog_name);
+    printf("Supported location types:\n"
+           "    /paris                  # city name\n"
+           "    /~Eiffel+tower          # any location (+ for spaces)\n"
+           "    /Москва                 # Unicode name of any location in any "
+           "language\n"
+           "    /muc                    # airport code (3 letters)\n"
+           "    /@stackoverflow.com     # domain name\n"
+           "    /94107                  # area codes\n"
+           "    /-78.46,106.79          # GPS coordinates\n\n");
 }
 
 void print_version(const char *prog_name)
@@ -25,11 +34,9 @@ void print_version(const char *prog_name)
            PROJECT_VERSION_MINOR, PROJECT_VERSION_PATCH);
 }
 
-
-
 int main(int argc, char const *argv[])
 {
-    char uri[1024];
+    char *url;
 
     // Проверка аргументов командной строки
     if ((argc > 1) && (strcmp(argv[1], "--version") == 0))
@@ -41,43 +48,33 @@ int main(int argc, char const *argv[])
     {
         fprintf(stderr, "\nToo few parameters\n\n");
         print_usage(argv[0]);
-        strcpy(uri, "https://wttr.in/Moscow?format=j1");
-        // exit(EXIT_FAILURE);
+        url = make_url("Moscow");
     }
     else
     {
-        if(strlen(argv[1]) >= (sizeof(uri)-2))
-        {
-            strncpy(uri, argv[1], (sizeof(uri)-2));
-            uri[(sizeof(uri)-1)] = '\0';
-        }
-        else
-        {
-            strcpy(uri, argv[1]);
-        }
-        
+        url = make_url(argv[1]);
+    }
+
+    if (url == NULL)
+    {
+        fprintf(stderr, "Wrong place\n");
+        return EXIT_FAILURE;
     }
 
     // Выполнение запроса
-    char *resp = do_get(uri);
-    if(resp == NULL)
+    char *resp = do_get(url);
+    if (resp == NULL)
     {
-        fprintf(stderr, "Error while do request \"%s\"\n", argv[1]);
+        fprintf(stderr, "Error while do request \"%s\"\n", url);
+        free(url);
         return EXIT_FAILURE;
     }
+
+    free(url);
 
     // Разбор принятых данных
-    struct WeatherData *w_data = parse_data(resp);
+    parse_data(resp);
     free(resp);
-    if(w_data == NULL)
-    {
-        fprintf(stderr, "Error while do request \"%s\"\n", argv[1]);
-        return EXIT_FAILURE;
-    }
-
-    // Печать структуры WeatherData
-    print_weather_data(w_data);
-    free_weather_data(w_data);
 
     return EXIT_SUCCESS;
 }
