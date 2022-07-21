@@ -21,6 +21,6 @@ struct WordDescr
     struct WordDescr *next;
 };
 
-bool read_words(const char *fname, HashTable table);
-void print_words_array(HashTable table);
-void hashtable_delete(HashTable table);
+bool read_words(const char *fname, HashTable *table);
+void print_words_array(HashTable *table);
+void hashtable_delete(HashTable *table);

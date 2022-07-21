@@ -4,20 +4,31 @@
 #ifndef _HASHTABLE_H_
 #define _HASHTABLE_H_
 
-/// Размер хэш-таблицы
-#define HASH_TABLE_SIZE 512
-
-struct HashRow
+struct WordInfo
 {
-    // unsigned long long hash;
-    void *data;
+    char *word;
+    int counter;
 };
 
 /// Хэш-таблица
-typedef struct HashRow HashTable[HASH_TABLE_SIZE];
+typedef struct HashTable HashTable;
 
-unsigned long long get_str_hash(const char *buf);
-bool hashtable_init(HashTable table);
-void *hashtable_get(HashTable table, unsigned long long hash);
+HashTable * hashtable_init();
+const struct WordInfo *  hashtable_add(HashTable *table, const char *str);
+const struct WordInfo *  hashtable_get(HashTable *table, const char *str);
+void hashtable_free(HashTable *table);
+
+struct WordInfo * hashtable_iterate(HashTable *table, struct WordInfo *iter);
+
+
+/**
+ * @brief      { struct_description }
+ */
+struct HashTable
+{
+    struct WordInfo **table;
+    int size;
+    int taken;
+};
 
 #endif // _HASHTABLE_H_

@@ -38,20 +38,19 @@ int main(int argc, char const *argv[])
     }
 
     // Инициализация таблицы
-    HashTable words_array;
-    hashtable_init(words_array);
+    HashTable *words_array = hashtable_init();
 
     // Анализ файла (подсчет слов)
     if (!read_words(argv[1], words_array))
     {
-        hashtable_delete(words_array);
+        hashtable_free(words_array);
         fprintf(stderr, "Can not read words from file \"%s\"\n", argv[1]);
         exit(EXIT_FAILURE);
     }
 
     // Печать результата
     print_words_array(words_array);
-    hashtable_delete(words_array);
+    hashtable_free(words_array);
 
     return EXIT_SUCCESS;
 }
