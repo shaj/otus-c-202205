@@ -74,20 +74,20 @@ outm:
 
 ;;; f proc
 f:
-    mov rax, rsi
+    mov rax, rsi      ; new_list в выходной параметр
 
-    test rdi, rdi
+    test rdi, rdi     ; Проверяем исходный список. Если пустой, то выходим.
     jz outf
 
     push rbx
     push r12
     push r13
 
-    mov rbx, rdi
-    mov r12, rsi
-    mov r13, rdx
+    mov rbx, rdi      ; Исходный список
+    mov r12, rsi      ; Выходной список
+    mov r13, rdx      ; Функция фильтра
 
-    mov rdi, [rdi]
+    mov rdi, [rdi]    ; 
     call rdx
     test rax, rax
     jz z
