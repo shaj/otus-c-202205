@@ -1,5 +1,6 @@
 
 
+#include <ctype.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -9,6 +10,11 @@
 
 #include "hashtable.h"
 #include "word_counter.h"
+
+static struct
+{
+    size_t words_readed;
+} telemetr;
 
 /**
  * @brief      Adds a character to buffer.
@@ -21,64 +27,6 @@ static inline void add_char_to_buf(int in_char, char **pc)
     **pc = (char)in_char;
     (*pc)++;
 }
-
-/**
- * @brief      Добавление с лова в таблицу
- *
- * @param[in]  table  Таблица, куда добавлять
- * @param      buf    Указатель на null-terminated слово
- *
- * @return     true - слово успешно добавлено
- */
-// bool add_word(HashTable table, const char *buf)
-// {
-//     struct WordDescr **word_descr;
-
-//     if (buf[0] == '\0')
-//     {
-//         return true; // Ошибки нет. Просто пустую строку не добавляем.
-//     }
-
-//     unsigned long long hash = get_str_hash(buf);
-
-// #ifdef DEBUG
-//     printf("Added word \"%s\" with hash 0x%08llx (0x%02llx)\n", buf, hash,
-//            hash % HASH_TABLE_SIZE);
-// #endif // DEBUG
-
-//     word_descr = (struct WordDescr **)hashtable_get(table, hash);
-//     while (((*word_descr) != NULL) && (strcmp((*word_descr)->word, buf) != 0))
-//     {
-//         word_descr = &((*word_descr)->next);
-//     }
-
-//     if ((*word_descr) == NULL)
-//     {
-//         *word_descr = create_word_descr(buf);
-//         if (*word_descr == NULL)
-//         {
-//             fprintf(stderr, "Can not add word to list.\n");
-//             return false;
-//         }
-//     }
-//     else
-//     {
-//         if (strcmp((*word_descr)->word, buf) == 0)
-//         {
-//             (*word_descr)->counter++;
-//         }
-//         else
-//         {
-//             *word_descr = create_word_descr(buf);
-//             if (*word_descr == NULL)
-//             {
-//                 fprintf(stderr, "Can not add word to list.\n");
-//                 return false;
-//             }
-//         }
-//     }
-//     return true;
-// }
 
 /**
  * @brief      Проверка типа входного файла
@@ -117,6 +65,8 @@ bool read_words(const char *fname, HashTable *table)
     int in_char;
     FILE *hfile;
 
+    telemetr.words_readed = 0;
+
     // Открытие входного файлов
     if (!regular_file_check(fname))
     {
@@ -132,17 +82,21 @@ bool read_words(const char *fname, HashTable *table)
 
     pc = buf;
     bool retval = true;
-    do
+    for (;;)
     {
         in_char = fgetc(hfile);
         if (feof(hfile))
         {
             *pc = '\0';
-            if(buf[0] != '\0')
+            if (buf[0] != '\0')
             {
                 if (!hashtable_add(table, buf))
                 {
                     retval = false;
+                }
+                else
+                {
+                    telemetr.words_readed++;
                 }
             }
             break;
@@ -151,42 +105,43 @@ bool read_words(const char *fname, HashTable *table)
         {
             fprintf(stderr, "Too long word. More than %d bytes.", BUF_SIZE);
             *pc = '\0';
-            if(buf[0] != '\0')
+            if (buf[0] != '\0')
             {
                 if (!hashtable_add(table, buf))
                 {
                     retval = false;
                     break;
                 }
+                telemetr.words_readed++;
             }
         }
         if (in_char > 0x7f)
         {
             add_char_to_buf(in_char, &pc);
         }
-        else if (((in_char | 0x20) >= 'a') && ((in_char | 0x20) <= 'z'))
+        else if (isalnum(in_char))
         {
             add_char_to_buf(in_char, &pc);
         }
         else
         {
             *pc = '\0';
-            if(buf[0] != '\0')
+            if (buf[0] != '\0')
             {
                 if (!hashtable_add(table, buf))
                 {
                     retval = false;
                     break;
                 }
+                telemetr.words_readed++;
             }
             pc = buf;
         }
-    } while (1);
+    }
 
     fclose(hfile);
     return retval;
 }
-
 
 /**
  * @brief      Вывод в консоль результата
@@ -195,72 +150,24 @@ bool read_words(const char *fname, HashTable *table)
  */
 void print_words_array(HashTable *table)
 {
-//     struct WordDescr *word_descr;
+    size_t words_stored = 0;
 
-// #ifdef DEBUG
-//     printf("\n\nReport:\n");
-//     for (int i = 0; i < HASH_TABLE_SIZE; i++)
-//     {
-//         if (table[i].data != NULL)
-//         {
-//             printf("Hash %4d | ", i);
-//             word_descr = (struct WordDescr *)table[i].data;
-//             while (word_descr != NULL)
-//             {
-//                 printf(" \"%s\" %ld", word_descr->word, word_descr->counter);
-//                 word_descr = word_descr->next;
-//             }
-//             printf("\n");
-//         }
-//     }
-//     printf("\n\n");
-// #endif // DEBUG
-
-//     int wc = 0;
-//     int chain = 0;
-//     int max_chain = 0;
-//     int empty_cells = 0;
-
-//     for (int i = 0; i < HASH_TABLE_SIZE; i++)
-//     {
-//         if (table[i].data != NULL)
-//         {
-//             chain = 0;
-//             word_descr = (struct WordDescr *)table[i].data;
-//             while (word_descr != NULL)
-//             {
-//                 printf("\"%s\" %ld\n", word_descr->word, word_descr->counter);
-//                 word_descr = word_descr->next;
-//                 chain++;
-//                 wc++;
-//             }
-//             if (max_chain < chain)
-//             {
-//                 max_chain = chain;
-//             }
-//         }
-//         else
-//         {
-//             empty_cells++;
-//         }
-//     }
-//     printf("\nВсего слов: %d\n", wc);
-//     printf("Пустых ячеек: %d из %d\n", empty_cells, HASH_TABLE_SIZE);
-//     printf("Максимальная длина цепочки: %d\n", max_chain);
-
-    if(table == NULL)
+    if (table == NULL)
         return;
-    if(table->table == NULL)
+    if (hashtable_get_size(table) == 0)
         return;
-    for(int i=0; i<table->size; i++)
+
+    struct HashtableIterator iter;
+    hashtable_iter_init(&iter, table);
+    while (iter.wi != NULL)
     {
-        if(table->table[i] != NULL)
-        {
-            printf("%5d  \"%s\" %d\n", i, table->table[i]->word, table->table[i]->counter);
-        }
+        printf("%6d  \"%s\" %d\n", iter.idx, iter.wi->word, iter.wi->counter);
+        // printf("%s\n", iter.wi->word);
+        words_stored += iter.wi->counter;
+        hashtable_iter_next(&iter);
     }
-    printf("\n\nSize: %d\nTaken: %d\n", table->size, table->taken);
-
-    return;
+    fprintf(stderr, "\n\nSize: %d\nTaken: %d\n", hashtable_get_size(table),
+            hashtable_get_taken(table));
+    fprintf(stderr, "\nПрочитано слов %ld\nСохранено слов %ld\n", telemetr.words_readed,
+            words_stored);
 }
-

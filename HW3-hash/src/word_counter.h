@@ -21,6 +21,20 @@ struct WordDescr
     struct WordDescr *next;
 };
 
+/**
+ * @brief      Чтение слов из файла
+ *
+ * @param[in]  fname  Имя файла
+ * @param[in]  table  Хэш-таблица, куда читать
+ *
+ * @return     true  - файл успешно прочитан
+ *             false - при чтении файла были ошибки
+ */
 bool read_words(const char *fname, HashTable *table);
+
+/**
+ * @brief      Вывод в консоль результата
+ *
+ * @param[in]  table  The table
+ */
 void print_words_array(HashTable *table);
-void hashtable_delete(HashTable *table);

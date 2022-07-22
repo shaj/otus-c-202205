@@ -11,15 +11,12 @@
 #include "version.h"
 #include "word_counter.h"
 
-void print_usage(const char *prog_name)
-{
-    printf("Usage: %s <input file>\n", prog_name);
-}
+void print_usage(const char *prog_name) { printf("Usage: %s <input file>\n", prog_name); }
 
 void print_version(const char *prog_name)
 {
-    printf("%s %d.%d.%d\n", prog_name, PROJECT_VERSION_MAJOR,
-           PROJECT_VERSION_MINOR, PROJECT_VERSION_PATCH);
+    printf("%s %d.%d.%d\n", prog_name, PROJECT_VERSION_MAJOR, PROJECT_VERSION_MINOR,
+           PROJECT_VERSION_PATCH);
 }
 
 int main(int argc, char const *argv[])
