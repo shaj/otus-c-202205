@@ -11,11 +11,12 @@
  * Set hash `key` to `val`.
  */
 
-inline void
+inline int
 hash_set(hash_t *self, char *key, void *val) {
   int ret;
   khiter_t k = kh_put(ptr, self, key, &ret);
   kh_value(self, k) = val;
+  return ret;
 }
 
 /*

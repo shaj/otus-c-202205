@@ -1380,7 +1380,9 @@ int clib_package_install(clib_package_t *pkg, const char *dir, int verbose) {
 #ifdef HAVE_PTHREADS
     pthread_mutex_lock(&lock.mutex);
 #endif
-    hash_set(visited_packages, strdup(pkg->name), "t");
+    char *dup_pkg_name = strdup(pkg->name);
+    if(hash_set(visited_packages, dup_pkg_name, "t") == 0)
+      free(dup_pkg_name);
 #ifdef HAVE_PTHREADS
     pthread_mutex_unlock(&lock.mutex);
 #endif

@@ -88,7 +88,7 @@ typedef khash_t(ptr) hash_t;
 
 // protos
 
-void
+int
 hash_set(hash_t *self, char *key, void *val);
 
 void *
