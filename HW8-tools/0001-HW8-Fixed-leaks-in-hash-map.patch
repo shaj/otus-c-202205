@@ -1,0 +1,60 @@
+From f9dcf4afcd12c329922fc94a843984f77440b1ea Mon Sep 17 00:00:00 2001
+From: ShajTester <kolobrod2002@yandex.ru>
+Date: Thu, 4 Aug 2022 18:00:40 +0300
+Subject: [PATCH 1/2] HW8: Fixed leaks in hash map
+
+---
+ HW8-tools/clib/deps/hash/hash.c          | 3 ++-
+ HW8-tools/clib/deps/hash/hash.h          | 2 +-
+ HW8-tools/clib/src/common/clib-package.c | 4 +++-
+ 3 files changed, 6 insertions(+), 3 deletions(-)
+
+diff --git a/HW8-tools/clib/deps/hash/hash.c b/HW8-tools/clib/deps/hash/hash.c
+index ba11a43..4afaf50 100755
+--- a/HW8-tools/clib/deps/hash/hash.c
++++ b/HW8-tools/clib/deps/hash/hash.c
+@@ -11,11 +11,12 @@
+  * Set hash `key` to `val`.
+  */
+ 
+-inline void
++inline int
+ hash_set(hash_t *self, char *key, void *val) {
+   int ret;
+   khiter_t k = kh_put(ptr, self, key, &ret);
+   kh_value(self, k) = val;
++  return ret;
+ }
+ 
+ /*
+diff --git a/HW8-tools/clib/deps/hash/hash.h b/HW8-tools/clib/deps/hash/hash.h
+index 6b3cf16..940e660 100755
+--- a/HW8-tools/clib/deps/hash/hash.h
++++ b/HW8-tools/clib/deps/hash/hash.h
+@@ -88,7 +88,7 @@ typedef khash_t(ptr) hash_t;
+ 
+ // protos
+ 
+-void
++int
+ hash_set(hash_t *self, char *key, void *val);
+ 
+ void *
+diff --git a/HW8-tools/clib/src/common/clib-package.c b/HW8-tools/clib/src/common/clib-package.c
+index 268538e..4d93cf9 100755
+--- a/HW8-tools/clib/src/common/clib-package.c
++++ b/HW8-tools/clib/src/common/clib-package.c
+@@ -1380,7 +1380,9 @@ int clib_package_install(clib_package_t *pkg, const char *dir, int verbose) {
+ #ifdef HAVE_PTHREADS
+     pthread_mutex_lock(&lock.mutex);
+ #endif
+-    hash_set(visited_packages, strdup(pkg->name), "t");
++    char *dup_pkg_name = strdup(pkg->name);
++    if(hash_set(visited_packages, dup_pkg_name, "t") == 0)
++      free(dup_pkg_name);
+ #ifdef HAVE_PTHREADS
+     pthread_mutex_unlock(&lock.mutex);
+ #endif
+-- 
+2.25.1
+

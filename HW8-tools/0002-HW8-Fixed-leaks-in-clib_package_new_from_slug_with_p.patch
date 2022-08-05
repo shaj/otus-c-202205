@@ -1,0 +1,35 @@
+From 291375a5d2567b253a6f578038d4eedf5b8e3759 Mon Sep 17 00:00:00 2001
+From: ShajTester <kolobrod2002@yandex.ru>
+Date: Thu, 4 Aug 2022 17:29:04 +0300
+Subject: [PATCH 2/2] HW8: Fixed leaks in
+ clib_package_new_from_slug_with_package_name cicle
+
+---
+ HW8-tools/clib/src/common/clib-package.c | 7 ++++++-
+ 1 file changed, 6 insertions(+), 1 deletion(-)
+
+diff --git a/HW8-tools/clib/src/common/clib-package.c b/HW8-tools/clib/src/common/clib-package.c
+index 4d93cf9..c91a594 100755
+--- a/HW8-tools/clib/src/common/clib-package.c
++++ b/HW8-tools/clib/src/common/clib-package.c
+@@ -661,11 +661,16 @@ clib_package_new_from_slug_with_package_name(const char *slug, int verbose,
+ #else
+       res = http_get(json_url);
+ #endif
+-      json = res->data;
+       _debug("status: %d", res->status);
+       if (!res || !res->ok) {
++        if(res)
++        {
++          http_get_free(res);
++          res = NULL;
++        }
+         goto download;
+       }
++      json = res->data;
+       log = "fetch";
+     }
+   }
+-- 
+2.25.1
+
