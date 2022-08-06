@@ -19,13 +19,12 @@ wav-файлы. Сторонние библиотеки (кроме GLib/GStream
 2. Тестовый пайплайн с участием созданного модуля успешно проигрывает звуковой файл (файл для
    проверки прилагается).
 3. Код компилируется без предупреждений с ключами компилятора `-Wall -Wextra -Wpedantic -std=c11`.
-4. Далее успешность определяется ревью кода.
 
 ## Вспомогательные материалы
 
 1. [Reading the header of a wav file](https://onestepcode.com/read-wav-header)
 2. [GStreamer: open source multimedia framework](https://gstreamer.freedesktop.org/)
-3. [Habr 1](https://habr.com/ru/post/178813), [Habr 2](https://habr.com/ru/post/179167), [Habr 3](https://habr.com/ru/post/204014)
+3. Цикл статей на хабре о GStreamer: [Habr 1](https://habr.com/ru/post/178813), [Habr 2](https://habr.com/ru/post/179167), [Habr 3](https://habr.com/ru/post/204014)
 4. v1.x - stable ([Keynote](https://gstconf.ubicast.tv/videos/keynote-gstreamer-10), [Porting 0.10 to 1.0](https://gstreamer.freedesktop.org/documentation/application-development/appendix/porting-1-0.html?gi-language=c))
 5. [gst-element-maker](https://gitlab.freedesktop.org/gstreamer/gst-plugins-bad/-/blob/master/tools/gst-element-maker)
 6. GStreamer plugins [Plugin Writer’s Guide](https://gstreamer.freedesktop.org/documentation/plugin-development/?gi-language=c)
