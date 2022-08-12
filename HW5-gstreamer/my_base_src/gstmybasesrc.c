@@ -96,7 +96,7 @@ GST_STATIC_PAD_TEMPLATE ("src",
 
 G_DEFINE_TYPE_WITH_CODE (GstMybasesrc, gst_mybasesrc, GST_TYPE_BASE_SRC,
   GST_DEBUG_CATEGORY_INIT (gst_mybasesrc_debug_category, "mybasesrc", 0,
-  "debug category for mybasesrc element"));
+  "debug category for mybasesrc element"))
 
 static void
 gst_mybasesrc_class_init (GstMybasesrcClass * klass)
