@@ -2,7 +2,8 @@ FROM gcc:11
 
 RUN apt update && apt upgrade -y \ 
     && apt install -y git cmake make autoconf build-essential libtool \
-            texinfo xterm locales
+            texinfo xterm locales \
+    && apt install -y valgrind clang-format clang-tidy
     
 RUN mkdir /distr
 WORKDIR /distr

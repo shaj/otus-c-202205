@@ -15,7 +15,7 @@
    3. glib Key-value file parser
       1. https://developer-old.gnome.org/glib/unstable/glib-Key-value-file-parser.html
       2. https://stackoverflow.com/questions/17444865/read-values-from-config-text-using-glib
-3. [ ] Демонизация
+3. [x] Демонизация
 4. [ ] Санитайзеры
 5. [ ] Пайпы и именованные пайпы
 6. [ ] Сокеты
