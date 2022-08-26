@@ -8,10 +8,12 @@
    2. Личный фаворит `gengetopt`
    3. [Установка](https://www.gnu.org/software/gengetopt/gengetopt.html)
    4. Например [cmake](https://github.com/SimonRit/RTK/blob/master/cmake/FindGengetopt.cmake)
-2. [ ] Чтение (формат) конфига
+2. [x] Чтение (формат) конфига
    1. *(16) Демоны UNIX*
    2. YAML
       1. [libyaml](https://github.com/yaml/libyaml)
+      2. https://yaml.org/
+      3. TODO: https://github.com/tlsa/libcyaml
    3. glib Key-value file parser
       1. https://developer-old.gnome.org/glib/unstable/glib-Key-value-file-parser.html
       2. https://stackoverflow.com/questions/17444865/read-values-from-config-text-using-glib
@@ -19,6 +21,7 @@
 4. [ ] Санитайзеры
 5. [ ] Пайпы и именованные пайпы
 6. [ ] Сокеты
+7. [ ] Тестирование
 
 
 

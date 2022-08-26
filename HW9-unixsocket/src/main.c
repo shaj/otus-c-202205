@@ -89,7 +89,7 @@ static void daemonize()
     chdir("/");
 
     /* Close all open file descriptors */
-    for (fd = sysconf(_SC_OPEN_MAX); fd > 0; fd--)
+    for (fd = sysconf(_SC_OPEN_MAX); fd >= 0; fd--)
     {
         close(fd);
     }
@@ -138,9 +138,10 @@ int main(int argc, char **argv)
     /* Read configuration from config file */
     (void)read_conf_file(&args_info);
 
-    printf("PID name: %s\n", args_info.pid_file_arg);
-    printf("socket file name: %s\n", args_info.unix_socket_name_arg);
-    printf("Config: %s\n", args_info.config_arg);
+    printf("PID file name: <%s>\n", args_info.pid_file_arg);
+    printf("socket file name: <%s>\n", args_info.unix_socket_name_arg);
+    printf("Config: <%s>\n", args_info.config_arg);
+    printf("Observed file: <%s>\n", args_info.observed_file_arg);
 
     pid_file_name = args_info.pid_file_arg;
 

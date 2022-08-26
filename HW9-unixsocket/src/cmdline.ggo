@@ -7,3 +7,5 @@ option "daemonize" d "daemonize" flag off
 option "unix-socket-name" s "Unix socket file name" string typestr="filename" optional default="/tmp/fsized.socket"
 option "config" c "Config file name" string typestr="filename" optional default="fsized.yaml"
 option "pid-file" p "PID file name" string typestr="filename" optional default="/tmp/fsized.pid"
+
+option "observed-file" f "The name of the file to watch" string typestr="filename" hidden optional default=""
