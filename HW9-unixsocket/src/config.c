@@ -1,6 +1,6 @@
 
-#include <stdbool.h>
 #include <fcntl.h>
+#include <stdbool.h>
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <yaml.h>
@@ -32,9 +32,9 @@ struct parser_state
     enum state state; /* The current parse state */
     enum Keys key_state;
     bool observed_file_given;
-    char * observed_file_name;
+    char *observed_file_name;
     bool socket_name_given;
-    char * socket_name;
+    char *socket_name;
     bool daemon_given;
     bool daemon;
 };
@@ -43,40 +43,28 @@ int consume_event(struct parser_state *s, yaml_event_t *event)
 {
     switch (event->type)
     {
-    case YAML_STREAM_START_EVENT:
-        printf("YAML_STREAM_START_EVENT\n");
-        break;
     case YAML_DOCUMENT_START_EVENT:
-        printf("YAML_DOCUMENT_START_EVENT\n");
         s->key_state = KEY_NONE;
         break;
     case YAML_STREAM_END_EVENT:
-        printf("YAML_STREAM_END_EVENT\n");
         s->state = STATE_STOP; /* All done. */
         break;
-    case YAML_MAPPING_START_EVENT:
-        printf("YAML_MAPPING_START_EVENT\n");
-        break;
-    case YAML_DOCUMENT_END_EVENT:
-        printf("YAML_DOCUMENT_END_EVENT\n");
-        break;
     case YAML_SCALAR_EVENT:
-        printf("YAML_SCALAR_EVENT ((%d)) %s\n", s->key_state, (char *)event->data.scalar.value);
         switch (s->key_state)
         {
         case KEY_NONE:
         {
-            if(strcmp((char *)event->data.scalar.value, "file_name") == 0)
+            if (strcmp((char *)event->data.scalar.value, "file_name") == 0)
             {
                 s->key_state = KEY_SCAN_FILE_NAME;
                 break;
             }
-            else if(strcmp((char *)event->data.scalar.value, "socket_name") == 0)
+            else if (strcmp((char *)event->data.scalar.value, "socket_name") == 0)
             {
                 s->key_state = KET_SOCKET_NAME;
                 break;
             }
-            else if(strcmp((char *)event->data.scalar.value, "daemonize") == 0)
+            else if (strcmp((char *)event->data.scalar.value, "daemonize") == 0)
             {
                 s->key_state = KEY_DAEMON;
                 break;
@@ -97,7 +85,7 @@ int consume_event(struct parser_state *s, yaml_event_t *event)
             break;
         case KEY_DAEMON:
         {
-            if(strcmp((char *)event->data.scalar.value, "true") == 0)
+            if (strcmp((char *)event->data.scalar.value, "true") == 0)
                 s->daemon = true;
             else
                 s->daemon = false;
@@ -110,16 +98,6 @@ int consume_event(struct parser_state *s, yaml_event_t *event)
             break;
         }
         break;
-    case YAML_SEQUENCE_START_EVENT:
-        printf("YAML_SEQUENCE_START_EVENT\n");
-        break;
-    case YAML_MAPPING_END_EVENT:
-        printf("YAML_MAPPING_END_EVENT\n");
-        break;
-    case YAML_SEQUENCE_END_EVENT:
-        printf("YAML_SEQUENCE_END_EVENT\n");
-        break;
-
     default:
         break;
     }
@@ -128,14 +106,14 @@ int consume_event(struct parser_state *s, yaml_event_t *event)
 
 int read_conf_file(struct gengetopt_args_info *args_info)
 {
-    int code;
+    int code = EXIT_SUCCESS;
     struct parser_state state;
     yaml_parser_t parser;
     yaml_event_t event;
     FILE *fd_conf;
 
     fd_conf = fopen(args_info->config_arg, "r");
-    if(fd_conf == NULL)
+    if (fd_conf == NULL)
     {
         perror("Can't open config file");
         return EXIT_FAILURE;
@@ -170,21 +148,21 @@ int read_conf_file(struct gengetopt_args_info *args_info)
         yaml_event_delete(&event);
     } while (state.state != STATE_STOP);
 
-    if(!args_info->unix_socket_name_given && state.socket_name_given)
+    if (!args_info->unix_socket_name_given && state.socket_name_given)
     {
-        if(args_info->unix_socket_name_arg != NULL)
+        if (args_info->unix_socket_name_arg != NULL)
             free(args_info->unix_socket_name_arg);
         args_info->unix_socket_name_arg = strdup(state.socket_name);
     }
 
-    if(!args_info->observed_file_given && state.observed_file_given)
+    if (!args_info->observed_file_given && state.observed_file_given)
     {
-        if(args_info->observed_file_arg != NULL)
+        if (args_info->observed_file_arg != NULL)
             free(args_info->observed_file_arg);
         args_info->observed_file_arg = strdup(state.observed_file_name);
     }
 
-    if(!args_info->daemonize_given && state.daemon_given)
+    if (!args_info->daemonize_given && state.daemon_given)
     {
         args_info->daemonize_flag = (int)state.daemon;
     }
@@ -192,9 +170,9 @@ int read_conf_file(struct gengetopt_args_info *args_info)
 done:
     fclose(fd_conf);
 
-    if(state.observed_file_name != NULL)
+    if (state.observed_file_name != NULL)
         free(state.observed_file_name);
-    if(state.socket_name != NULL)
+    if (state.socket_name != NULL)
         free(state.socket_name);
 
     yaml_parser_delete(&parser);

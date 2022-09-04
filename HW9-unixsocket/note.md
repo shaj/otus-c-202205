@@ -9,7 +9,7 @@
    3. [Установка](https://www.gnu.org/software/gengetopt/gengetopt.html)
    4. Например [cmake](https://github.com/SimonRit/RTK/blob/master/cmake/FindGengetopt.cmake)
 2. [x] Чтение (формат) конфига
-   1. *(16) Демоны UNIX*
+   1. *(18) Демоны UNIX*
    2. YAML
       1. [libyaml](https://github.com/yaml/libyaml)
       2. https://yaml.org/
@@ -18,12 +18,27 @@
       1. https://developer-old.gnome.org/glib/unstable/glib-Key-value-file-parser.html
       2. https://stackoverflow.com/questions/17444865/read-values-from-config-text-using-glib
 3. [x] Демонизация
+   1. https://github.com/jirihnidek/daemon/blob/master/src/daemon.c
 4. [ ] Санитайзеры
+   1. `gcc`
+   2. `cppcheck`
+   3. `clang-tidy`
 5. [ ] Пайпы и именованные пайпы
-6. [ ] Сокеты
+6. [x] Сокеты
+   1. Клиент для проверки `nc` (netcat)
+   2. `nc -U <socket.name>`
+   3. Команд не ждать. Выдавать строку и разрывать соединение.
 7. [ ] Тестирование
 
+## TODO
 
+1. [ ] Обновление конфигурации
+2. [x] После демонизации все выводы в лог
+3. [x] Ошибки сокета: `exit` заменить на `goto`
+4. [x] `if (sock != 0)` - вроде это не совсем корректно (`main.c:46`)
+5. [ ] С версией не понятно что.
+   - нужно объединить версию в cmake и в gengetopt
+6. [ ]
 
 ## ggo example
 

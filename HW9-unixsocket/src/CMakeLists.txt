@@ -4,6 +4,7 @@ set(SOURCE
     main.c
     cmdline.c
     config.c
+    file_info.c
 )
 
 include(gengetopt)

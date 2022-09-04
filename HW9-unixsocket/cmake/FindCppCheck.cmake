@@ -47,24 +47,24 @@ if(CPPCHECK_BIN)
         message(FATAL "Couldn't recognize ${CPPCHECK_BIN} version")
     endif()
 
-    set(CPPCHECK_THREADS_ARG "-j4" CACHE STRING "The number of threads to use")
+    set(CPPCHECK_THREADS_ARG " -j4 " CACHE STRING "The number of threads to use")
     set(CPPCHECK_PROJECT_ARG
-        "--project=${PROJECT_BINARY_DIR}/compile_commands.json"
+        " --project=${PROJECT_BINARY_DIR}/compile_commands.json "
         CACHE STRING "The project directory to use"
     )
     set(CPPCHECK_BUILD_DIR_ARG
-        "--cppcheck-build-dir=${PROJECT_BINARY_DIR}/analysis/cppcheck"
+        " --cppcheck-build-dir=${PROJECT_BINARY_DIR}/analysis/cppcheck"
         CACHE STRING "The build directory to use"
     )
 
     # Don't show these errors
     if(EXISTS "${CMAKE_SOURCE_DIR}/.cppcheck-suppressions")
         set(CPPCHECK_SUPPRESSIONS
-            "--suppressions-list=${CMAKE_SOURCE_DIR}/.cppcheck-suppressions"
+            " --suppressions-list=${CMAKE_SOURCE_DIR}/.cppcheck-suppressions"
             CACHE STRING "The suppressions file to use"
         )
     else()
-        set(CPPCHECK_SUPPRESSIONS "" CACHE STRING
+        set(CPPCHECK_SUPPRESSIONS " " CACHE STRING
                                            "The suppressions file to use"
         )
     endif()
@@ -72,26 +72,26 @@ if(CPPCHECK_BIN)
     # Show these errors but don't fail the build
     if(EXISTS "${CMAKE_SOURCE_DIR}/.cppcheck-exitcode-suppressions")
         set(CPPCHECK_EXITCODE_SUPPRESSIONS
-            "--exitcode-suppressions=${CMAKE_SOURCE_DIR}/.cppcheck-exitcode-suppressions"
+            " --exitcode-suppressions=${CMAKE_SOURCE_DIR}/.cppcheck-exitcode-suppressions"
             CACHE STRING "The exitcode suppressions file to use"
         )
     else()
-        set(CPPCHECK_EXITCODE_SUPPRESSIONS ""
+        set(CPPCHECK_EXITCODE_SUPPRESSIONS " "
             CACHE STRING "The exitcode suppressions file to use"
         )
     endif()
 
-    set(CPPCHECK_ERROR_EXITCODE_ARG "--error-exitcode=1"
+    set(CPPCHECK_ERROR_EXITCODE_ARG " --error-exitcode=1"
         CACHE STRING "The exitcode to use if an error is found"
     )
-    set(CPPCHECK_CHECKS_ARGS "--enable=warning"
+    set(CPPCHECK_CHECKS_ARGS " --enable=warning"
         CACHE STRING "Arguments for the checks to run"
     )
-    set(CPPCHECK_OTHER_ARGS "" CACHE STRING "Other arguments")
+    set(CPPCHECK_OTHER_ARGS " " CACHE STRING "Other arguments")
 
     set(_CPPCHECK_EXCLUDES)
     foreach(ex ${CPPCHECK_EXCLUDES})
-        list(APPEND _CPPCHECK_EXCLUDES "-i${ex}")
+        list(APPEND _CPPCHECK_EXCLUDES " -i${ex}")
     endforeach(ex)
 
     set(CPPCHECK_ALL_ARGS
@@ -106,13 +106,17 @@ if(CPPCHECK_BIN)
         ${_CPPCHECK_EXCLUDES}
     )
 
-    if(NOT CPPCHECK_XML_OUTPUT)
-        set(CPPCHECK_COMMAND ${CPPCHECK_BIN} ${CPPCHECK_ALL_ARGS})
-    else()
-        set(CPPCHECK_COMMAND ${CPPCHECK_BIN} ${CPPCHECK_ALL_ARGS} --xml
-                             --xml-version=2 2> ${CPPCHECK_XML_OUTPUT}
-        )
-    endif()
+    set(CPPCHECK_COMMAND ${CPPCHECK_BIN} " -q " ${CPPCHECK_ALL_ARGS})
+
+    message (${CPPCHECK_COMMAND})
+
+    # if ( TRUE ) # if(NOT CPPCHECK_XML_OUTPUT)
+    #     set(CPPCHECK_COMMAND ${CPPCHECK_BIN} ${CPPCHECK_ALL_ARGS})
+    # else()
+    #     set(CPPCHECK_COMMAND ${CPPCHECK_BIN} ${CPPCHECK_ALL_ARGS} --xml
+    #                          --xml-version=2 2> ${CPPCHECK_XML_OUTPUT}
+    #     )
+    # endif()
 endif()
 
 include(FindPackageHandleStandardArgs)

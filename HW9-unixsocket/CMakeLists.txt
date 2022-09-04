@@ -4,6 +4,7 @@ project(fsized VERSION 0.0.1 LANGUAGES C)
 
 list(APPEND CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/cmake")
 include(CodeFormat)
+include (CodeAnalysis)
 
 add_subdirectory(src)
 

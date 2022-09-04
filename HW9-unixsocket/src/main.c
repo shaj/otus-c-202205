@@ -1,29 +1,42 @@
 
+#include <errno.h>
 #include <fcntl.h>
 #include <signal.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <sys/stat.h>
 #include <syslog.h>
 #include <unistd.h>
-#include <sys/stat.h>
 
 #include <yaml.h>
 
 #include "cmdline.h"
 #include "config.h"
+#include "file_info.h"
 #include "version.h"
+
+// Sockets
+#include <string.h>
+#include <sys/socket.h>
+#include <sys/un.h>
 
 static int running;
 static int pid_fd = -1;
 static const char *pid_file_name = NULL;
+static int sock = -1;
 
+/**
+ * @brief Обработчик сигналов
+ *
+ * @param sig
+ */
 void handle_signal(int sig)
 {
     if ((sig == SIGINT) || (sig == SIGTERM))
     {
-        syslog(LOG_INFO, "Debug: stopping daemon ...\n");
+        syslog(LOG_INFO, "Debug: stopping daemon ... %d %d %s\n", pid_fd, sock, pid_file_name);
         /* Unlock and close lockfile */
         if (pid_fd != -1)
         {
@@ -36,6 +49,8 @@ void handle_signal(int sig)
             unlink(pid_file_name);
         }
         running = 0;
+        if (sock >= 0)
+            close(sock);
         /* Reset signal handling to default behavior */
         signal(SIGINT, SIG_DFL);
     }
@@ -50,6 +65,10 @@ void handle_signal(int sig)
     }
 }
 
+/**
+ * @brief Демонизация
+ *
+ */
 static void daemonize()
 {
     pid_t pid = 0;
@@ -125,14 +144,17 @@ static void daemonize()
 
 int main(int argc, char **argv)
 {
+    int retval = EXIT_SUCCESS;
+
     struct gengetopt_args_info args_info;
 
     openlog("fsized", LOG_PID | LOG_CONS, LOG_DAEMON);
-    syslog(LOG_INFO, "Started (1) %s", argv[0]);
+    syslog(LOG_INFO, "Started (1) %s\n", argv[0]);
 
     if (cmdline_parser(argc, argv, &args_info) != 0)
     {
-        exit(1);
+        fprintf(stderr, "cmdline_parser error");
+        exit(EXIT_FAILURE);
     }
 
     /* Read configuration from config file */
@@ -151,7 +173,7 @@ int main(int argc, char **argv)
     }
 
     /* Open system log and write message to it */
-    syslog(LOG_INFO, "Started (2) %s", argv[0]);
+    syslog(LOG_INFO, "Started (2) %s\n", argv[0]);
 
     /* Daemon will handle two signals */
     signal(SIGINT, handle_signal);
@@ -161,19 +183,60 @@ int main(int argc, char **argv)
     /* This global variable can be changed in function handling signal */
     running = 1;
 
-    /* Never ending loop of server */
+    int msgsock;
+    struct sockaddr_un server;
+    char buf[1024];
+
+    sock = socket(AF_UNIX, SOCK_STREAM, 0);
+    if (sock < 0)
+    {
+        // perror("opening stream socket");
+        syslog(LOG_ERR, "Can't create socket: %s\n", strerror(errno));
+        retval = EXIT_FAILURE;
+        goto exit_1;
+    }
+    server.sun_family = AF_UNIX;
+    strcpy(server.sun_path, args_info.unix_socket_name_arg);
+    if (bind(sock, (struct sockaddr *)&server, sizeof(struct sockaddr_un)))
+    {
+        // perror("binding stream socket");
+        syslog(LOG_ERR, "Can't bind stream socket: %s\n", strerror(errno));
+        retval = EXIT_FAILURE;
+        goto exit_1;
+    }
+
+    listen(sock, 5);
+
     while (running == 1)
     {
-
-        /* Real server should use select() or poll() for waiting at
-         * asynchronous event. Note: sleep() is interrupted, when
-         * signal is received. */
-        sleep(3);
+        msgsock = accept(sock, NULL, NULL);
+        if (msgsock == -1)
+        {
+            // Сюда мы попадаем при штатном выходе.
+            // Поэтому сообщения выводить не надо.
+            // perror("accept");
+            break;
+        }
+        else
+        {
+            if (get_fileinfo_str(args_info.observed_file_arg, buf) > 0)
+            {
+                send(msgsock, buf, strlen(buf), 0);
+            }
+            else
+            {
+                sprintf(buf, "Test string");
+                send(msgsock, buf, strlen(buf), 0);
+            }
+        }
+        close(msgsock);
     }
+
+exit_1:
+    close(sock);
+    unlink(args_info.unix_socket_name_arg);
 
     cmdline_parser_free(&args_info);
 
-    printf("MAIN WORKING CICLE\n\n");
-
-    return 0;
+    return retval;
 }
