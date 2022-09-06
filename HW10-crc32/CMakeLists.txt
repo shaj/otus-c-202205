@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.4)
 
 project(mmapcrc VERSION 0.0.1 LANGUAGES C)
 
-# set(SOURCES src/crc32.c)
+set(SOURCES src/crc32.c)
 
 add_executable(${PROJECT_NAME} src/main.c ${SOURCES})
 
