@@ -27,33 +27,119 @@ void print_version(const char *prog_name)
 struct StatData
 {
     size_t cnt;
+    size_t all_objects_size;
+    size_t status_err;
     SimpleSet part_cnts;
 };
 
 void init_stat_data(struct StatData *data)
 {
     data->cnt = 0;
+    data->all_objects_size = 0;
+    data->status_err = 0;
     set_init(&data->part_cnts);
 }
 
-void delete_stat_data(struct StatData *data) { set_destroy(&data->part_cnts); }
+void delete_stat_data(struct StatData *data)
+{
+    // ...
+    set_destroy(&data->part_cnts);
+}
 
 int line_parser(struct StatData *pdata, const char *line, int len)
 {
     pdata->cnt++;
 
     const char *pws = line;
+    const char *request;
+    int request_len;
+    const char *status_code_str;
+    int status_code_len;
+    int status_code;
+    const char *size_object_str;
+    int size_object_len;
+    int size_object;
+    const char *referer;
+    int referer_len;
+
+    int ret;
+
     int part_cnt = 0;
     char out_str[64];
 
-    while (pws != NULL)
+    pws = strchr(pws, ' '); // hyphen
+    if (pws == NULL)
+        return -1;
+    pws++;
+    pws = strchr(pws, ' '); // userid
+    if (pws == NULL)
+        return -1;
+    pws++;
+    pws = strchr(pws, ' '); // time
+    if (pws == NULL)
+        return -1;
+    pws++;
+    pws = strstr(pws, "] \""); // request
+    if (pws == NULL)
+        return -1;
+    pws += 3;
+    request = pws;
+    pws = strstr(pws, "\" "); // status code
+    if (pws == NULL)
+        return -1;
+    pws += 2;
+    request_len = pws - request;
+    status_code_str = pws;
+    pws = strchr(pws, ' '); // size of the object
+    if (pws == NULL)
+        return -1;
+    pws++;
+    status_code_len = pws - status_code_str;
+    size_object_str = pws;
+    pws = strstr(pws, " \""); // referer
+    if (pws == NULL)
+        return -1;
+    pws += 2;
+    size_object_len = pws - size_object_str;
+    referer = pws;
+    pws = strstr(pws, "\" \""); // user_agent
+    if (pws == NULL)
+        return -1;
+    pws += 3;
+    referer_len = pws - referer;
+    pws = strchr(pws, '\"');
+    if (pws == NULL)
     {
-        part_cnt++;
-        pws++;
-        pws = strchr(pws, ' ');
+        return -2;
     }
-    snprintf(out_str, sizeof(out_str), "%d", part_cnt);
-    set_add(&pdata->part_cnts, out_str);
+    pws++;
+    if(*pws == ' ')
+    {
+        // printf("^^^%s\n", pws);
+        return -2;
+    }
+
+    ret = sscanf(status_code_str, " %d ", &status_code);
+    if (ret != 1)
+    {
+        fprintf(stderr, "status code err: %d %d : %0.10s\n", ret, status_code, status_code_str);
+        return -3;
+    }
+    ret = sscanf(size_object_str, "%d ", &size_object);
+    if (ret != 1)
+    {
+        fprintf(stderr, "size obect err: %d %d\n", ret, status_code);
+        return -3;
+    }
+
+    if((status_code >= 200) && (status_code < 300))
+    {
+        pdata->all_objects_size += size_object;
+    }
+    else
+    {
+        pdata->status_err++;
+    }
 
     (void)len;
     return 0;
@@ -73,7 +159,8 @@ void print_report(struct StatData *pdata)
         free(rep[i]);
     }
     free(rep);
-    printf("\n");
+    printf("\nAll objects size: %lu\nStatus errors: %lu\n", pdata->all_objects_size, pdata->status_err);
+
 }
 
 int main(int argc, char const *argv[])
@@ -176,10 +263,11 @@ int main(int argc, char const *argv[])
                 fflush(stdout);
                 continue;
             }
-            if (line_parser(pdata, line, len) == -1)
-            {
-                fprintf(stderr, "Parsing error in %s : %d\nBreak\n", de->d_name, line_cnt);
-            }
+            int ret = line_parser(pdata, line, len);
+            // if (ret != 0)
+            // {
+            //     fprintf(stderr, "Parsing error in %s : %d %d\n", de->d_name, line_cnt, ret);
+            // }
         }
 
         fclose(fp);
