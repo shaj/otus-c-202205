@@ -11,6 +11,7 @@
 #include <unistd.h>
 
 #include "set.h"
+#include "hashtable.h"
 #include "version.h"
 
 void print_usage(const char *prog_name)
@@ -30,6 +31,8 @@ struct StatData
     size_t all_objects_size;
     size_t status_err;
     SimpleSet part_cnts;
+    HashTable *urls;
+    HashTable *referers;
 };
 
 void init_stat_data(struct StatData *data)
@@ -38,12 +41,51 @@ void init_stat_data(struct StatData *data)
     data->all_objects_size = 0;
     data->status_err = 0;
     set_init(&data->part_cnts);
+    data->urls = hashtable_init();
+    data->referers = hashtable_init();
 }
 
 void delete_stat_data(struct StatData *data)
 {
-    // ...
     set_destroy(&data->part_cnts);
+    hashtable_free(data->urls);
+    hashtable_free(data->referers);
+}
+
+
+char* urldup(const char *request, int request_len)
+{
+    const char *pws;
+    const char *url;
+    int url_size = 0;
+
+    url = strchr(request, ' ');
+    if(url == NULL)
+    {
+        return NULL;
+    }
+    pws = strchr(url, '?');
+    if(pws > request + request_len)
+    {
+        url_size = request_len - (url - request); 
+    }
+    else if(pws == NULL)
+    {
+        pws = strchr(url, ' ');
+        if((pws == NULL) || (pws > request + request_len))
+        {
+            url_size = request_len - (url - request);
+        }
+        else
+        {
+            url_size = pws - url;
+        }
+    }
+    else{
+        url_size = pws - url;
+    }
+
+    return strndup(url, url_size);
 }
 
 int line_parser(struct StatData *pdata, const char *line, int len)
@@ -61,6 +103,7 @@ int line_parser(struct StatData *pdata, const char *line, int len)
     int size_object;
     const char *referer;
     int referer_len;
+    char *url;
 
     int ret;
 
@@ -132,7 +175,21 @@ int line_parser(struct StatData *pdata, const char *line, int len)
         return -3;
     }
 
-    if((status_code >= 200) && (status_code < 300))
+    url = urldup(request, request_len);
+    if(url != NULL)
+    {
+        hashtable_add(pdata->urls, url);
+    }
+    if((referer != NULL) && (referer_len != 0))
+    {
+        referer = strndup(referer, referer_len);
+        if(referer != NULL)
+        {
+            hashtable_add(pdata->referers, referer);
+        }
+    }
+    // if((status_code >= 200) && (status_code < 300))
+    if(status_code < 400)
     {
         pdata->all_objects_size += size_object;
     }
@@ -160,7 +217,8 @@ void print_report(struct StatData *pdata)
     }
     free(rep);
     printf("\nAll objects size: %lu\nStatus errors: %lu\n", pdata->all_objects_size, pdata->status_err);
-
+    printf("URL's count: %d\n", hashtable_get_taken(pdata->urls));
+    printf("Referers's count: %d\n", hashtable_get_taken(pdata->referers));
 }
 
 int main(int argc, char const *argv[])

@@ -2,7 +2,10 @@ cmake_minimum_required(VERSION 3.4)
 
 project(logscan VERSION 0.0.1 LANGUAGES C)
 
-set(SOURCES src/set.c)
+set(SOURCES 
+    src/set.c
+    src/hashtable.c
+)
 
 add_executable(${PROJECT_NAME} src/main.c ${SOURCES})
 
