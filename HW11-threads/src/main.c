@@ -57,6 +57,7 @@ char* urldup(const char *request, int request_len)
 {
     const char *pws;
     const char *url;
+    const char *args;
     int url_size = 0;
 
     url = strchr(request, ' ');
@@ -64,27 +65,27 @@ char* urldup(const char *request, int request_len)
     {
         return NULL;
     }
-    pws = strchr(url, '?');
-    if(pws > request + request_len)
+    url++;
+    pws = strchr(url, ' ');
+    if((pws == NULL) || (pws > (request + request_len)))
     {
-        url_size = request_len - (url - request); 
+        url_size = request_len - (url - request);
     }
-    else if(pws == NULL)
+    else 
     {
-        pws = strchr(url, ' ');
-        if((pws == NULL) || (pws > request + request_len))
-        {
-            url_size = request_len - (url - request);
-        }
-        else
+        args = strchr(url, '?');
+        if((args == NULL) || (args > (request + request_len)))
         {
             url_size = pws - url;
         }
-    }
-    else{
-        url_size = pws - url;
+        else
+        {
+            url_size = args - url;
+        }
     }
 
+    if(url_size == 0)
+        return NULL;
     return strndup(url, url_size);
 }
 
@@ -102,13 +103,14 @@ int line_parser(struct StatData *pdata, const char *line, int len)
     int size_object_len;
     int size_object;
     const char *referer;
+    char *referer_dup;
     int referer_len;
     char *url;
 
     int ret;
 
-    int part_cnt = 0;
-    char out_str[64];
+    // int part_cnt = 0;
+    // char out_str[64];
 
     pws = strchr(pws, ' '); // hyphen
     if (pws == NULL)
@@ -130,26 +132,26 @@ int line_parser(struct StatData *pdata, const char *line, int len)
     pws = strstr(pws, "\" "); // status code
     if (pws == NULL)
         return -1;
-    pws += 2;
     request_len = pws - request;
+    pws += 2;
     status_code_str = pws;
     pws = strchr(pws, ' '); // size of the object
     if (pws == NULL)
         return -1;
-    pws++;
     status_code_len = pws - status_code_str;
+    pws++;
     size_object_str = pws;
     pws = strstr(pws, " \""); // referer
     if (pws == NULL)
         return -1;
-    pws += 2;
     size_object_len = pws - size_object_str;
+    pws += 2;
     referer = pws;
     pws = strstr(pws, "\" \""); // user_agent
     if (pws == NULL)
         return -1;
-    pws += 3;
     referer_len = pws - referer;
+    pws += 3;
     pws = strchr(pws, '\"');
     if (pws == NULL)
     {
@@ -179,24 +181,32 @@ int line_parser(struct StatData *pdata, const char *line, int len)
     if(url != NULL)
     {
         hashtable_add(pdata->urls, url);
+        free(url);
     }
     if((referer != NULL) && (referer_len != 0))
     {
-        referer = strndup(referer, referer_len);
-        if(referer != NULL)
+        referer_dup = strndup(referer, referer_len);
+        if(referer_dup != NULL)
         {
-            hashtable_add(pdata->referers, referer);
+            hashtable_add(pdata->referers, referer_dup);
         }
+        free(referer_dup);
+    }
+
+    char *status_code_str_dup = strndup(status_code_str, status_code_len);
+    if(status_code_str_dup != NULL)
+    {
+        set_add(&(pdata->part_cnts), status_code_str_dup);
     }
     // if((status_code >= 200) && (status_code < 300))
-    if(status_code < 400)
-    {
+    // if(status_code < 400)
+    // {
         pdata->all_objects_size += size_object;
-    }
-    else
-    {
-        pdata->status_err++;
-    }
+    // }
+    // else
+    // {
+    //     pdata->status_err++;
+    // }
 
     (void)len;
     return 0;
@@ -219,6 +229,27 @@ void print_report(struct StatData *pdata)
     printf("\nAll objects size: %lu\nStatus errors: %lu\n", pdata->all_objects_size, pdata->status_err);
     printf("URL's count: %d\n", hashtable_get_taken(pdata->urls));
     printf("Referers's count: %d\n", hashtable_get_taken(pdata->referers));
+
+    struct HashtableIterator iter;
+    printf("\n\nURL's report:\n==========\n");
+    hashtable_iter_init(&iter, pdata->urls);
+    for(int i=0; i<10; i++)
+    {
+        if(iter.wi == NULL)
+            break;
+        printf("%d  <%s>\n", iter.wi->counter, iter.wi->word);
+        hashtable_iter_next(&iter);
+    }
+
+    printf("\n\nReferer's report:\n==========\n");
+    hashtable_iter_init(&iter, pdata->referers);
+    for(int i=0; i<10; i++)
+    {
+        if(iter.wi == NULL)
+            break;
+        printf("%d  <%s>\n", iter.wi->counter, iter.wi->word);
+        hashtable_iter_next(&iter);
+    }
 }
 
 int main(int argc, char const *argv[])
@@ -322,6 +353,7 @@ int main(int argc, char const *argv[])
                 continue;
             }
             int ret = line_parser(pdata, line, len);
+            (void)ret;
             // if (ret != 0)
             // {
             //     fprintf(stderr, "Parsing error in %s : %d %d\n", de->d_name, line_cnt, ret);
