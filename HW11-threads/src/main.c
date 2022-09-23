@@ -10,8 +10,8 @@
 #include <sys/types.h>
 #include <unistd.h>
 
-#include "set.h"
 #include "hashtable.h"
+#include "set.h"
 #include "version.h"
 
 void print_usage(const char *prog_name)
@@ -52,8 +52,7 @@ void delete_stat_data(struct StatData *data)
     hashtable_free(data->referers);
 }
 
-
-char* urldup(const char *request, int request_len)
+char *urldup(const char *request, int request_len)
 {
     const char *pws;
     const char *url;
@@ -61,20 +60,20 @@ char* urldup(const char *request, int request_len)
     int url_size = 0;
 
     url = strchr(request, ' ');
-    if(url == NULL)
+    if (url == NULL)
     {
         return NULL;
     }
     url++;
     pws = strchr(url, ' ');
-    if((pws == NULL) || (pws > (request + request_len)))
+    if ((pws == NULL) || (pws > (request + request_len)))
     {
         url_size = request_len - (url - request);
     }
-    else 
+    else
     {
         args = strchr(url, '?');
-        if((args == NULL) || (args > (request + request_len)))
+        if ((args == NULL) || (args > (request + request_len)))
         {
             url_size = pws - url;
         }
@@ -84,7 +83,7 @@ char* urldup(const char *request, int request_len)
         }
     }
 
-    if(url_size == 0)
+    if (url_size == 0)
         return NULL;
     return strndup(url, url_size);
 }
@@ -158,7 +157,7 @@ int line_parser(struct StatData *pdata, const char *line, int len)
         return -2;
     }
     pws++;
-    if(*pws == ' ')
+    if (*pws == ' ')
     {
         // printf("^^^%s\n", pws);
         return -2;
@@ -178,15 +177,15 @@ int line_parser(struct StatData *pdata, const char *line, int len)
     }
 
     url = urldup(request, request_len);
-    if(url != NULL)
+    if (url != NULL)
     {
         hashtable_add(pdata->urls, url);
         free(url);
     }
-    if((referer != NULL) && (referer_len != 0))
+    if ((referer != NULL) && (referer_len != 0))
     {
         referer_dup = strndup(referer, referer_len);
-        if(referer_dup != NULL)
+        if (referer_dup != NULL)
         {
             hashtable_add(pdata->referers, referer_dup);
         }
@@ -194,14 +193,14 @@ int line_parser(struct StatData *pdata, const char *line, int len)
     }
 
     char *status_code_str_dup = strndup(status_code_str, status_code_len);
-    if(status_code_str_dup != NULL)
+    if (status_code_str_dup != NULL)
     {
         set_add(&(pdata->part_cnts), status_code_str_dup);
     }
     // if((status_code >= 200) && (status_code < 300))
     // if(status_code < 400)
     // {
-        pdata->all_objects_size += size_object;
+    pdata->all_objects_size += size_object;
     // }
     // else
     // {
@@ -210,6 +209,40 @@ int line_parser(struct StatData *pdata, const char *line, int len)
 
     (void)len;
     return 0;
+}
+
+char *http2utf8_dup(const char *str)
+{
+    int size = strlen(str);
+    char *buf = malloc(size);
+    if (buf == NULL)
+        return NULL;
+
+    const char *c = str;
+    char *b = buf;
+    while (*c != 0)
+    {
+        if (*c != '%')
+        {
+            *b = *c;
+            b++;
+            c++;
+        }
+        else if (*(c + 1) != '%')
+        {
+            *b = (char)strtol(++c, NULL, 16);
+            b++;
+            c += 2;
+        }
+        else
+        {
+            *b = '%';
+            b++;
+            c += 2;
+        }
+    }
+    *b = 0;
+    return buf;
 }
 
 void print_report(struct StatData *pdata)
@@ -226,29 +259,54 @@ void print_report(struct StatData *pdata)
         free(rep[i]);
     }
     free(rep);
-    printf("\nAll objects size: %lu\nStatus errors: %lu\n", pdata->all_objects_size, pdata->status_err);
+    printf("\nAll objects size: %lu\nStatus errors: %lu\n", pdata->all_objects_size,
+           pdata->status_err);
     printf("URL's count: %d\n", hashtable_get_taken(pdata->urls));
     printf("Referers's count: %d\n", hashtable_get_taken(pdata->referers));
 
     struct HashtableIterator iter;
+    struct WordInfo *max_word;
+    char *url_utf8;
     printf("\n\nURL's report:\n==========\n");
-    hashtable_iter_init(&iter, pdata->urls);
-    for(int i=0; i<10; i++)
+    for (int i = 0; i < 10; i++)
     {
-        if(iter.wi == NULL)
-            break;
-        printf("%d  <%s>\n", iter.wi->counter, iter.wi->word);
-        hashtable_iter_next(&iter);
+        hashtable_iter_init(&iter, pdata->urls);
+        // if(iter.wi == NULL)
+        //     break;
+        max_word = iter.wi;
+        while (iter.wi != NULL)
+        {
+            if (iter.wi->counter > max_word->counter)
+            {
+                max_word = iter.wi;
+            }
+            hashtable_iter_next(&iter);
+        }
+        url_utf8 = http2utf8_dup(max_word->word);
+        printf("%d  <%s>\n", max_word->counter, url_utf8);
+        free(url_utf8);
+        max_word->counter = 0;
     }
 
     printf("\n\nReferer's report:\n==========\n");
-    hashtable_iter_init(&iter, pdata->referers);
-    for(int i=0; i<10; i++)
+    for (int i = 0; i < 10; i++)
     {
-        if(iter.wi == NULL)
-            break;
-        printf("%d  <%s>\n", iter.wi->counter, iter.wi->word);
-        hashtable_iter_next(&iter);
+        hashtable_iter_init(&iter, pdata->referers);
+        // if(iter.wi == NULL)
+        //     break;
+        max_word = iter.wi;
+        while (iter.wi != NULL)
+        {
+            if (iter.wi->counter > max_word->counter)
+            {
+                max_word = iter.wi;
+            }
+            hashtable_iter_next(&iter);
+        }
+        url_utf8 = http2utf8_dup(max_word->word);
+        printf("%d  <%s>\n", max_word->counter, url_utf8);
+        free(url_utf8);
+        max_word->counter = 0;
     }
 }
 
