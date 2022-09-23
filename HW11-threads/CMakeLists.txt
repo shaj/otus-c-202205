@@ -15,3 +15,10 @@ target_compile_options(${PROJECT_NAME} PUBLIC -Wall -Wextra -Wpedantic)
 configure_file("${PROJECT_SOURCE_DIR}/src/version.h.in" "${PROJECT_BINARY_DIR}/version.h")
 target_include_directories(${PROJECT_NAME} PUBLIC "${PROJECT_BINARY_DIR}")
 
+add_executable(maint src/main-t.c)
+
+set_property(TARGET maint PROPERTY C_STANDARD 11)
+target_compile_options(maint PUBLIC -Wall -Wextra -Wpedantic)
+target_link_libraries(maint
+    pthread
+)
