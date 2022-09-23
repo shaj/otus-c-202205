@@ -196,6 +196,7 @@ int line_parser(struct StatData *pdata, const char *line, int len)
     if (status_code_str_dup != NULL)
     {
         set_add(&(pdata->part_cnts), status_code_str_dup);
+        free(status_code_str_dup);
     }
     // if((status_code >= 200) && (status_code < 300))
     // if(status_code < 400)
@@ -214,7 +215,7 @@ int line_parser(struct StatData *pdata, const char *line, int len)
 char *http2utf8_dup(const char *str)
 {
     int size = strlen(str);
-    char *buf = malloc(size);
+    char *buf = malloc(size + 1);
     if (buf == NULL)
         return NULL;
 
@@ -283,8 +284,11 @@ void print_report(struct StatData *pdata)
             hashtable_iter_next(&iter);
         }
         url_utf8 = http2utf8_dup(max_word->word);
-        printf("%d  <%s>\n", max_word->counter, url_utf8);
-        free(url_utf8);
+        if (url_utf8 != NULL)
+        {
+            printf("%d  <%s>\n", max_word->counter, url_utf8);
+            free(url_utf8);
+        }
         max_word->counter = 0;
     }
 
@@ -304,8 +308,11 @@ void print_report(struct StatData *pdata)
             hashtable_iter_next(&iter);
         }
         url_utf8 = http2utf8_dup(max_word->word);
-        printf("%d  <%s>\n", max_word->counter, url_utf8);
-        free(url_utf8);
+        if (url_utf8 != NULL)
+        {
+            printf("%d  <%s>\n", max_word->counter, url_utf8);
+            free(url_utf8);
+        }
         max_word->counter = 0;
     }
 }
