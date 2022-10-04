@@ -10,6 +10,9 @@
 #include <sys/types.h>
 #include <unistd.h>
 
+#include <pthread.h>
+#include <stdatomic.h>
+
 #include "hashtable.h"
 #include "set.h"
 #include "version.h"
@@ -25,14 +28,20 @@ void print_version(const char *prog_name)
            PROJECT_VERSION_PATCH);
 }
 
+
 struct StatData
 {
-    size_t cnt;
-    size_t all_objects_size;
-    size_t status_err;
+    atomic_size_t cnt;
+    atomic_size_t all_objects_size;
+    atomic_size_t status_err;
     SimpleSet part_cnts;
     HashTable *urls;
     HashTable *referers;
+
+    pthread_mutex_t part_mutex;
+    pthread_mutex_t urls_mutex;
+    pthread_mutex_t referers_mutex;
+    pthread_mutex_t cnt_mutex;
 };
 
 void init_stat_data(struct StatData *data)
@@ -43,6 +52,11 @@ void init_stat_data(struct StatData *data)
     set_init(&data->part_cnts);
     data->urls = hashtable_init();
     data->referers = hashtable_init();
+
+    pthread_mutex_init(&(data->part_mutex), NULL);
+    pthread_mutex_init(&(data->urls_mutex), NULL);
+    pthread_mutex_init(&(data->referers_mutex), NULL);
+    pthread_mutex_init(&(data->cnt_mutex), NULL);
 }
 
 void delete_stat_data(struct StatData *data)
@@ -50,7 +64,148 @@ void delete_stat_data(struct StatData *data)
     set_destroy(&data->part_cnts);
     hashtable_free(data->urls);
     hashtable_free(data->referers);
+
+    pthread_mutex_destroy(&(data->part_mutex));
+    pthread_mutex_destroy(&(data->urls_mutex));
+    pthread_mutex_destroy(&(data->referers_mutex));
+    pthread_mutex_destroy(&(data->cnt_mutex));
 }
+
+
+
+struct ThrdMsg
+{
+    char *line;
+    struct ThrdMsg *next;
+};
+
+struct ThrdPool
+{
+    int count;
+    int queue_depth;
+    int queue_depth_max;
+    struct ThrdMsg *msg_queue;
+    pthread_t *thrd_arr;
+    pthread_cond_t qready;
+    pthread_mutex_t qlock;
+
+    bool quit_flag;
+
+    struct StatData *stat_data;
+    int (*stat_data_func)(struct StatData *, char *);
+};
+
+int thrd_pool_msg_push(struct ThrdPool *pool, const char *line)
+{
+    int retval;
+    pthread_mutex_lock(&pool->qlock);
+    struct ThrdMsg *new_msg = malloc(sizeof(struct ThrdMsg));
+    new_msg->next = pool->msg_queue;
+    new_msg->line = strdup(line);
+    pool->msg_queue = new_msg;
+    pool->queue_depth++;
+    retval = pool->queue_depth;
+    if (pool->queue_depth > pool->queue_depth_max)
+    {
+        pool->queue_depth_max = pool->queue_depth;
+    }
+    pthread_cond_signal(&pool->qready);
+    pthread_mutex_unlock(&pool->qlock);
+
+    return retval;
+}
+
+void *thrd_pool_msg_pop(void *p)
+{
+    struct ThrdPool *pool = p;
+    struct ThrdMsg *msg;
+    size_t line_cnt = 0;
+    bool quit_flag = false;
+    while (!quit_flag)
+    {
+        pthread_mutex_lock(&pool->qlock);
+        while (pool->msg_queue == NULL)
+        {
+            if ((pool->msg_queue == NULL) && pool->quit_flag)
+            {
+                quit_flag = true;
+                pthread_mutex_unlock(&pool->qlock);
+                break;
+            }
+            pthread_cond_wait(&pool->qready, &pool->qlock);
+        }
+        if (pool->msg_queue != NULL)
+        {
+            msg = pool->msg_queue;
+            pool->msg_queue = msg->next;
+            pool->queue_depth--;
+            pthread_mutex_unlock(&pool->qlock);
+
+            (*pool->stat_data_func)(pool->stat_data, msg->line);
+            line_cnt++;
+            free(msg->line);
+            free(msg);
+        }
+    }
+    return (void *)line_cnt;
+}
+
+struct ThrdPool *thrd_pool_create(int thrd_count, int (*thrd_func)(struct StatData *, char *),
+                                  struct StatData *stat_data)
+{
+    struct ThrdPool *pool = malloc(sizeof(struct ThrdPool));
+    if (pool == NULL)
+    {
+        return NULL;
+    }
+    pool->thrd_arr = malloc(sizeof(pthread_t) * thrd_count);
+    if (pool->thrd_arr == NULL)
+    {
+        free(pool);
+        return NULL;
+    }
+    pool->quit_flag = false;
+    pool->count = thrd_count;
+    pool->queue_depth = 0;
+    pool->queue_depth_max = 0;
+    pool->msg_queue = NULL;
+    pool->stat_data = stat_data;
+    pool->stat_data_func = thrd_func;
+    pthread_mutex_init(&pool->qlock, NULL);
+    pthread_cond_init(&pool->qready, NULL);
+    for (int i = 0; i < thrd_count; i++)
+    {
+        int ret = pthread_create(&pool->thrd_arr[i], NULL, thrd_pool_msg_pop, pool);
+        if (ret != 0)
+        {
+            /// Ааааа... Всё пропало...
+            return NULL;
+        }
+    }
+
+    return pool;
+}
+
+int thrd_pool_destroy(struct ThrdPool *pool)
+{
+    void *ret;
+    // int summ = 0;
+    pool->quit_flag = true;
+    pthread_mutex_lock(&pool->qlock);
+    pthread_cond_broadcast(&pool->qready);
+    pthread_mutex_unlock(&pool->qlock);
+    for (int i = 0; i < pool->count; i++)
+    {
+        pthread_join(pool->thrd_arr[i], &ret);
+        printf("Joined %16lx :: %ld\n", pool->thrd_arr[i], (long)ret);
+        // summ += ret[0];
+    }
+    pthread_mutex_destroy(&pool->qlock);
+    pthread_cond_destroy(&pool->qready);
+    return 0;
+}
+
+
 
 char *urldup(const char *request, int request_len)
 {
@@ -88,9 +243,9 @@ char *urldup(const char *request, int request_len)
     return strndup(url, url_size);
 }
 
-int line_parser(struct StatData *pdata, const char *line, int len)
+int line_parser(struct StatData *pdata, char *line)
 {
-    pdata->cnt++;
+    atomic_fetch_add(&(pdata->cnt), 1);
 
     const char *pws = line;
     const char *request;
@@ -99,7 +254,7 @@ int line_parser(struct StatData *pdata, const char *line, int len)
     int status_code_len;
     int status_code;
     const char *size_object_str;
-    int size_object_len;
+    // int size_object_len;
     int size_object;
     const char *referer;
     char *referer_dup;
@@ -107,9 +262,6 @@ int line_parser(struct StatData *pdata, const char *line, int len)
     char *url;
 
     int ret;
-
-    // int part_cnt = 0;
-    // char out_str[64];
 
     pws = strchr(pws, ' '); // hyphen
     if (pws == NULL)
@@ -143,7 +295,7 @@ int line_parser(struct StatData *pdata, const char *line, int len)
     pws = strstr(pws, " \""); // referer
     if (pws == NULL)
         return -1;
-    size_object_len = pws - size_object_str;
+    // size_object_len = pws - size_object_str;
     pws += 2;
     referer = pws;
     pws = strstr(pws, "\" \""); // user_agent
@@ -159,14 +311,13 @@ int line_parser(struct StatData *pdata, const char *line, int len)
     pws++;
     if (*pws == ' ')
     {
-        // printf("^^^%s\n", pws);
         return -2;
     }
 
     ret = sscanf(status_code_str, " %d ", &status_code);
     if (ret != 1)
     {
-        fprintf(stderr, "status code err: %d %d : %0.10s\n", ret, status_code, status_code_str);
+        fprintf(stderr, "status code err: %d %d : %.10s\n", ret, status_code, status_code_str);
         return -3;
     }
     ret = sscanf(size_object_str, "%d ", &size_object);
@@ -179,7 +330,9 @@ int line_parser(struct StatData *pdata, const char *line, int len)
     url = urldup(request, request_len);
     if (url != NULL)
     {
+        pthread_mutex_lock(&(pdata->urls_mutex));
         hashtable_add(pdata->urls, url);
+        pthread_mutex_unlock(&(pdata->urls_mutex));
         free(url);
     }
     if ((referer != NULL) && (referer_len != 0))
@@ -187,7 +340,9 @@ int line_parser(struct StatData *pdata, const char *line, int len)
         referer_dup = strndup(referer, referer_len);
         if (referer_dup != NULL)
         {
+            pthread_mutex_lock(&(pdata->referers_mutex));
             hashtable_add(pdata->referers, referer_dup);
+            pthread_mutex_unlock(&(pdata->referers_mutex));
         }
         free(referer_dup);
     }
@@ -195,20 +350,21 @@ int line_parser(struct StatData *pdata, const char *line, int len)
     char *status_code_str_dup = strndup(status_code_str, status_code_len);
     if (status_code_str_dup != NULL)
     {
+        pthread_mutex_lock(&(pdata->part_mutex));
         set_add(&(pdata->part_cnts), status_code_str_dup);
+        pthread_mutex_unlock(&(pdata->part_mutex));
         free(status_code_str_dup);
     }
     // if((status_code >= 200) && (status_code < 300))
     // if(status_code < 400)
     // {
-    pdata->all_objects_size += size_object;
+    atomic_fetch_add(&(pdata->all_objects_size), size_object);
     // }
     // else
     // {
-    //     pdata->status_err++;
+    //     atomic_fetch_add(&(pdata->status_err), 1);
     // }
 
-    (void)len;
     return 0;
 }
 
@@ -366,11 +522,17 @@ int main(int argc, char const *argv[])
         exit(EXIT_FAILURE);
     }
 
-    // Подготовить пулл потоков
-
     struct StatData pdata[1];
     char full_name[2048];
     init_stat_data(pdata);
+    FILE *fp;
+    char *line = NULL;
+    size_t len = 0;
+    ssize_t read;
+    int line_cnt = 0;
+
+    // Подготовить пулл потоков
+    struct ThrdPool *pool = thrd_pool_create(number_threads, line_parser, pdata);
 
     // Запустить сканирование
     while ((de = readdir(dir)) != NULL)
@@ -393,12 +555,6 @@ int main(int argc, char const *argv[])
             continue;
         }
 
-        FILE *fp;
-        char *line = NULL;
-        size_t len = 0;
-        ssize_t read;
-        int line_cnt = 0;
-
         fp = fopen(full_name, "r");
         if (fp == NULL)
         {
@@ -417,20 +573,28 @@ int main(int argc, char const *argv[])
                 fflush(stdout);
                 continue;
             }
-            int ret = line_parser(pdata, line, len);
-            (void)ret;
-            // if (ret != 0)
+            int depth = thrd_pool_msg_push(pool, line);
+            (void)depth;
+            // if(depth > 100000)
             // {
-            //     fprintf(stderr, "Parsing error in %s : %d %d\n", de->d_name, line_cnt, ret);
+            //     sleep(1);
+            //     printf("depth %d\n", pool->queue_depth_max);
             // }
         }
+        printf("Depth %d\n", pool->queue_depth_max);
 
         fclose(fp);
         if (line)
         {
             free(line);
+            line = NULL;
         }
     }
+
+    thrd_pool_destroy(pool);
+
+    printf("all joined\n");
+    fflush(stdout);
 
     // Вывести отчет
     print_report(pdata);

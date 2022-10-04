@@ -42,7 +42,6 @@ void* foo()
         sleep(sl);
         printf("thread #%ld : %ld complete\n", pthread_self(), sl);
     }
-
     return (void*)0;
 }
 
@@ -51,18 +50,20 @@ void* foo()
 int main()
 {
     pthread_t pool[THRD_CNT];
+    int ptargs[THRD_CNT];
 
     msg.sz = 0;
 
     for(int i=0; i < THRD_CNT; i++)
     {
-        pthread_create(&pool[i], NULL, foo, NULL);
+        ptargs[i] = THRD_CNT - i;
+        pthread_create(&pool[i], NULL, foo, &ptargs[i]);
     }
     for (size_t i = 0; i < 20; i++)
     {
         printf("main %ld start\n", i);
         pthread_mutex_lock(&qlock);
-        msg.sz = (i * 6543) % 4 + 1;
+        msg.sz = i % 4 + 1;
         pthread_cond_signal(&qready);
         pthread_mutex_unlock(&qlock);
 
