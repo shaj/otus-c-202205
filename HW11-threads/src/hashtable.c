@@ -4,6 +4,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include <pthread.h>
+
 #include "hashtable.h"
 #include "powtable.h"
 
@@ -18,6 +20,8 @@ struct HashTable
     struct WordInfo **table;
     int size;
     int taken;
+
+    pthread_rwlock_t rw_mutex;
 };
 
 /**
@@ -141,6 +145,8 @@ HashTable *hashtable_create(size_t table_size)
         return NULL;
     }
     memset(table->table, 0, sizeof(struct WordInfo *) * table_size);
+    pthread_rwlock_init(&table->rw_mutex, NULL);
+
     return table;
 }
 
@@ -368,7 +374,9 @@ void hashtable_free(HashTable *table)
                 free(table->table[i]);
             }
         }
+        pthread_rwlock_destroy(&table->rw_mutex);
         free(table->table);
         free(table);
+
     }
 }
