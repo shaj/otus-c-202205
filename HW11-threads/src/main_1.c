@@ -14,7 +14,6 @@
 #include <stdatomic.h>
 
 #include "hashtable.h"
-#include "set.h"
 #include "version.h"
 
 void print_usage(const char *prog_name)
@@ -79,7 +78,7 @@ struct StatData
     atomic_size_t cnt;
     atomic_size_t all_objects_size;
     atomic_size_t status_err;
-    SimpleSet part_cnts;
+    HashTable *part_cnts;
     HashTable *urls;
     HashTable *referers;
 
@@ -94,7 +93,7 @@ void init_stat_data(struct StatData *data)
     data->cnt = 0;
     data->all_objects_size = 0;
     data->status_err = 0;
-    set_init(&data->part_cnts);
+    data->part_cnts = hashtable_init();;
     data->urls = hashtable_init();
     data->referers = hashtable_init();
 
@@ -106,7 +105,7 @@ void init_stat_data(struct StatData *data)
 
 void delete_stat_data(struct StatData *data)
 {
-    set_destroy(&data->part_cnts);
+    hashtable_free(data->part_cnts);
     hashtable_free(data->urls);
     hashtable_free(data->referers);
 
@@ -165,7 +164,7 @@ int line_parser(struct StatData *pdata, const char *line, int len)
     int status_code_len;
     int status_code;
     const char *size_object_str;
-    int size_object_len;
+    // int size_object_len;
     int size_object;
     const char *referer;
     char *referer_dup;
@@ -206,7 +205,7 @@ int line_parser(struct StatData *pdata, const char *line, int len)
     pws = strstr(pws, " \""); // referer
     if (pws == NULL)
         return -1;
-    size_object_len = pws - size_object_str;
+    // size_object_len = pws - size_object_str;
     pws += 2;
     referer = pws;
     pws = strstr(pws, "\" \""); // user_agent
@@ -263,7 +262,7 @@ int line_parser(struct StatData *pdata, const char *line, int len)
     if (status_code_str_dup != NULL)
     {
         pthread_mutex_lock(&(pdata->part_mutex));
-        set_add(&(pdata->part_cnts), status_code_str_dup);
+        hashtable_add(pdata->part_cnts, status_code_str_dup);
         pthread_mutex_unlock(&(pdata->part_mutex));
         free(status_code_str_dup);
     }
@@ -317,24 +316,22 @@ char *http2utf8_dup(const char *str)
 
 void print_report(struct StatData *pdata)
 {
-    size_t ui;
-    char **rep;
-
     printf("\n\nCNT = %lu\n", pdata->cnt);
-    rep = set_to_array(&pdata->part_cnts, &ui);
-    printf("Parts: ");
-    for (size_t i = 0; i < ui; i++)
+
+    struct HashtableIterator iter;
+    hashtable_iter_init(&iter, pdata->part_cnts);
+    printf("Status code:\n");
+    while (iter.wi != NULL)
     {
-        printf("%s ", rep[i]);
-        free(rep[i]);
+        printf("\"%s\" %d\n", iter.wi->word, iter.wi->counter);
+        hashtable_iter_next(&iter);
     }
-    free(rep);
+    
     printf("\nAll objects size: %lu\nStatus errors: %lu\n", pdata->all_objects_size,
            pdata->status_err);
     printf("URL's count: %d\n", hashtable_get_taken(pdata->urls));
     printf("Referers's count: %d\n", hashtable_get_taken(pdata->referers));
 
-    struct HashtableIterator iter;
     struct WordInfo *max_word;
     char *url_utf8;
     printf("\n\nURL's report:\n==========\n");
