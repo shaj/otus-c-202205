@@ -9,8 +9,10 @@
  */
 struct WordInfo
 {
-    char *word;
+    char *key;
+    void *value;
     int counter;
+
 };
 
 /// Хэш-таблица
@@ -25,13 +27,16 @@ HashTable *hashtable_init();
 
 /**
  * @brief      Добавление ключа в таблицу
+ * 
+ * Данные key/value не копируются.
  *
  * @param      table  Таблица
- * @param[in]  str    Ключ
+ * @param[in]  key    Ключ
+ * @param[in]  value  Указатель на значение
  *
  * @return     Структура, соответвующая ключу
  */
-const struct WordInfo *hashtable_add(HashTable *table, const char *str);
+const struct WordInfo *hashtable_add(HashTable *table, char *key, void *value);
 
 /**
  * @brief      Поиск данных по ключу
@@ -41,7 +46,7 @@ const struct WordInfo *hashtable_add(HashTable *table, const char *str);
  *
  * @return     NULL, если ключ не найден
  */
-const struct WordInfo *hashtable_get(HashTable *table, const char *str);
+const struct WordInfo *hashtable_get(HashTable *table, const char *key);
 
 /**
  * @brief      Удаление таблицы и освобождение памяти

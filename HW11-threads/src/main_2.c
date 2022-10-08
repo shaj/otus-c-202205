@@ -88,7 +88,7 @@ struct ThrdPool
     bool quit_flag;
 
     struct StatData *stat_data;
-    int (*stat_data_func)(struct StatData *, char *);
+    int (*stat_data_func)(struct StatData *, const char *);
 };
 
 int thrd_pool_msg_push(struct ThrdPool *pool, const char *line)
@@ -146,7 +146,7 @@ void *thrd_pool_msg_pop(void *p)
     return (void *)line_cnt;
 }
 
-struct ThrdPool *thrd_pool_create(int thrd_count, int (*thrd_func)(struct StatData *, char *),
+struct ThrdPool *thrd_pool_create(int thrd_count, int (*thrd_func)(struct StatData *, const char *),
                                   struct StatData *stat_data)
 {
     struct ThrdPool *pool = malloc(sizeof(struct ThrdPool));
@@ -198,6 +198,8 @@ int thrd_pool_destroy(struct ThrdPool *pool)
     }
     pthread_mutex_destroy(&pool->qlock);
     pthread_cond_destroy(&pool->qready);
+    free(pool->thrd_arr);
+    free(pool);
     return 0;
 }
 
@@ -239,7 +241,7 @@ char *urldup(const char *request, int request_len)
     return strndup(url, url_size);
 }
 
-int line_parser(struct StatData *pdata, char *line)
+int line_parser(struct StatData *pdata, const char *line)
 {
     atomic_fetch_add(&(pdata->cnt), 1);
 
@@ -251,11 +253,13 @@ int line_parser(struct StatData *pdata, char *line)
     int status_code;
     const char *size_object_str;
     // int size_object_len;
-    int size_object;
+    size_t size_object;
     const char *referer;
     char *referer_dup;
     int referer_len;
     char *url;
+    size_t *url_payload;
+    const struct WordInfo *wordinfo;
 
     int ret;
 
@@ -316,7 +320,7 @@ int line_parser(struct StatData *pdata, char *line)
         fprintf(stderr, "status code err: %d %d : %.10s\n", ret, status_code, status_code_str);
         return -3;
     }
-    ret = sscanf(size_object_str, "%d ", &size_object);
+    ret = sscanf(size_object_str, "%lu ", &size_object);
     if (ret != 1)
     {
         fprintf(stderr, "size obect err: %d %d\n", ret, status_code);
@@ -326,30 +330,44 @@ int line_parser(struct StatData *pdata, char *line)
     url = urldup(request, request_len);
     if (url != NULL)
     {
+        url_payload = malloc(sizeof(size_t));
+        if(url_payload != NULL)
+            *url_payload = size_object;
         pthread_mutex_lock(&(pdata->urls_mutex));
-        hashtable_add(pdata->urls, url);
+        wordinfo = hashtable_add(pdata->urls, url, url_payload);
+        if((wordinfo == NULL) || (wordinfo->counter != 1))
+        {
+            free(url);
+            free(url_payload);
+        }
         pthread_mutex_unlock(&(pdata->urls_mutex));
-        free(url);
     }
+
     if ((referer != NULL) && (referer_len != 0))
     {
         referer_dup = strndup(referer, referer_len);
         if (referer_dup != NULL)
         {
             pthread_mutex_lock(&(pdata->referers_mutex));
-            hashtable_add(pdata->referers, referer_dup);
+            wordinfo = hashtable_add(pdata->referers, referer_dup, NULL);
+            if((wordinfo == NULL) || (wordinfo->counter != 1))
+            {
+                free(referer_dup);
+            }
             pthread_mutex_unlock(&(pdata->referers_mutex));
         }
-        free(referer_dup);
     }
 
     char *status_code_str_dup = strndup(status_code_str, status_code_len);
     if (status_code_str_dup != NULL)
     {
         pthread_mutex_lock(&(pdata->part_mutex));
-        hashtable_add(pdata->part_cnts, status_code_str_dup);
+        wordinfo = hashtable_add(pdata->part_cnts, status_code_str_dup, NULL);
+        if((wordinfo == NULL) || (wordinfo->counter != 1))
+        {
+            free(status_code_str_dup);
+        }
         pthread_mutex_unlock(&(pdata->part_mutex));
-        free(status_code_str_dup);
     }
     // if((status_code >= 200) && (status_code < 300))
     // if(status_code < 400)
@@ -410,7 +428,7 @@ void print_report(struct StatData *pdata)
     printf("Status code:\n");
     while (iter.wi != NULL)
     {
-        printf("\"%s\" %d\n", iter.wi->word, iter.wi->counter);
+        printf("\"%s\" %d\n", iter.wi->key, iter.wi->counter);
         hashtable_iter_next(&iter);
     }
     
@@ -431,19 +449,22 @@ void print_report(struct StatData *pdata)
         max_word = iter.wi;
         while (iter.wi != NULL)
         {
-            if (iter.wi->counter > max_word->counter)
+            if(iter.wi->value != NULL)
             {
-                max_word = iter.wi;
+                if (*((size_t*)iter.wi->value) > *((size_t*)max_word->value))
+                {
+                    max_word = iter.wi;
+                }
             }
             hashtable_iter_next(&iter);
         }
-        url_utf8 = http2utf8_dup(max_word->word);
+        url_utf8 = http2utf8_dup(max_word->key);
         if (url_utf8 != NULL)
         {
-            printf("%d  <%s>\n", max_word->counter, url_utf8);
+            printf("%10ld  <%s>\n", *((size_t*)max_word->value), url_utf8);
             free(url_utf8);
         }
-        max_word->counter = 0;
+        *((size_t*)max_word->value) = 0;
     }
 
     printf("\n\nReferer's report:\n==========\n");
@@ -461,10 +482,10 @@ void print_report(struct StatData *pdata)
             }
             hashtable_iter_next(&iter);
         }
-        url_utf8 = http2utf8_dup(max_word->word);
+        url_utf8 = http2utf8_dup(max_word->key);
         if (url_utf8 != NULL)
         {
-            printf("%d  <%s>\n", max_word->counter, url_utf8);
+            printf("%10d  <%s>\n", max_word->counter, url_utf8);
             free(url_utf8);
         }
         max_word->counter = 0;

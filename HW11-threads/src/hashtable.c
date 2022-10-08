@@ -152,7 +152,7 @@ HashTable *hashtable_create(size_t table_size)
  *
  * @return     true - структура создана и слово добавлено
  */
-struct WordInfo *create_word_descr(const char *buf)
+struct WordInfo *create_word_descr(char *buf, void *value)
 {
     struct WordInfo *wd = (struct WordInfo *)malloc(sizeof(struct WordInfo));
     if (wd == NULL)
@@ -160,15 +160,17 @@ struct WordInfo *create_word_descr(const char *buf)
         fprintf(stderr, "ERROR. Out of memory\n");
         return NULL;
     }
-    wd->word = (char *)malloc(strlen(buf) + 1);
-    if (wd->word == NULL)
-    {
-        free(wd);
-        fprintf(stderr, "ERROR. Out of memory\n");
-        return NULL;
-    }
-    strcpy(wd->word, buf);
+    // wd->word = (char *)malloc(strlen(buf) + 1);
+    // if (wd->word == NULL)
+    // {
+    //     free(wd);
+    //     fprintf(stderr, "ERROR. Out of memory\n");
+    //     return NULL;
+    // }
+    // strcpy(wd->word, buf);
+    wd->key = buf;
     wd->counter = 1;
+    wd->value = value;
     return wd;
 }
 
@@ -188,12 +190,12 @@ HashTable *hashtable_init() { return hashtable_create(HASH_TABLE_SIZE); }
  *
  * @return     Индекс элемента в таблице
  */
-int hashtable_probe(HashTable *table, const char *str, int hash)
+int hashtable_probe(HashTable *table, const char *key, int hash)
 {
     if (hash >= table->size)
         return -1;
     int idx = hash;
-    while ((table->table[idx] != NULL) && (strcmp(table->table[idx]->word, str) != 0))
+    while ((table->table[idx] != NULL) && (strcmp(table->table[idx]->key, key) != 0))
     {
         idx++;
         if (idx == table->size)
@@ -216,14 +218,14 @@ int hashtable_probe(HashTable *table, const char *str, int hash)
  *
  * @return     Структура данных по ключу
  */
-struct WordInfo *put_new_word(HashTable *table, const char *str, int hash)
+struct WordInfo *put_new_word(HashTable *table, char *key, int hash, void *value)
 {
-    int idx = hashtable_probe(table, str, hash);
+    int idx = hashtable_probe(table, key, hash);
     if (idx == -1)
         return NULL;
     if (table->table[idx] == NULL)
     {
-        table->table[idx] = create_word_descr(str);
+        table->table[idx] = create_word_descr(key, value);
         table->taken++;
     }
     return table->table[idx];
@@ -238,9 +240,9 @@ struct WordInfo *put_new_word(HashTable *table, const char *str, int hash)
  *
  * @return     Структура данных по ключу
  */
-struct WordInfo *find_wi(HashTable *table, const char *str, int hash)
+struct WordInfo *find_wi(HashTable *table, const char *key, int hash)
 {
-    int idx = hashtable_probe(table, str, hash);
+    int idx = hashtable_probe(table, key, hash);
     if (idx == -1)
         return NULL;
     return table->table[idx];
@@ -269,8 +271,8 @@ bool resize_table(HashTable *table)
     {
         if (table->table[i] != NULL)
         {
-            int hash = get_str_hash(table->table[i]->word, new_table_size);
-            int idx = hashtable_probe(new_table, table->table[i]->word, hash);
+            int hash = get_str_hash(table->table[i]->key, new_table_size);
+            int idx = hashtable_probe(new_table, table->table[i]->key, hash);
             if (idx == -1)
             {
                 err = true;
@@ -281,8 +283,8 @@ bool resize_table(HashTable *table)
                 fprintf(stderr,
                         "ERROR. Cell is busy. Word \"%s\" %d (%d). Replacing with word \"%s\" %d "
                         "(%d)\n",
-                        new_table->table[idx]->word, new_table->table[idx]->counter, idx,
-                        table->table[i]->word, table->table[i]->counter, i);
+                        new_table->table[idx]->key, new_table->table[idx]->counter, idx,
+                        table->table[i]->key, table->table[i]->counter, i);
             }
             new_table->table[idx] = table->table[i];
             new_table->taken++;
@@ -312,10 +314,10 @@ bool resize_table(HashTable *table)
  *
  * @return     Структура, соответвующая ключу
  */
-const struct WordInfo *hashtable_add(HashTable *table, const char *str)
+const struct WordInfo *hashtable_add(HashTable *table, char *key, void *value)
 {
-    int hash = get_str_hash(str, table->size);
-    struct WordInfo *wi = find_wi(table, str, hash);
+    int hash = get_str_hash(key, table->size);
+    struct WordInfo *wi = find_wi(table, key, hash);
     if (wi != NULL)
     {
         wi->counter++;
@@ -329,9 +331,9 @@ const struct WordInfo *hashtable_add(HashTable *table, const char *str)
             fprintf(stderr, "Can not create a data structure\n");
             return NULL;
         }
-        hash = get_str_hash(str, table->size);
+        hash = get_str_hash(key, table->size);
     }
-    return put_new_word(table, str, hash);
+    return put_new_word(table, key, hash, value);
 }
 
 /**
@@ -342,10 +344,10 @@ const struct WordInfo *hashtable_add(HashTable *table, const char *str)
  *
  * @return     { description_of_the_return_value }
  */
-const struct WordInfo *hashtable_get(HashTable *table, const char *str)
+const struct WordInfo *hashtable_get(HashTable *table, const char *key)
 {
-    int hash = get_str_hash(str, table->size);
-    return find_wi(table, str, hash);
+    int hash = get_str_hash(key, table->size);
+    return find_wi(table, key, hash);
 }
 
 /**
@@ -361,9 +363,13 @@ void hashtable_free(HashTable *table)
         {
             if (table->table[i] != NULL)
             {
-                if (table->table[i]->word != NULL)
+                if (table->table[i]->key != NULL)
                 {
-                    free(table->table[i]->word);
+                    free(table->table[i]->key);
+                }
+                if(table->table[i]->value != NULL)
+                {
+                    free(table->table[i]->value);
                 }
                 free(table->table[i]);
             }

@@ -32,9 +32,9 @@ void* foo()
             msg.sz = 0;
         pthread_mutex_unlock(&qlock);
 
-        // pthread_mutex_lock(&revlock);
-        // pthread_cond_signal(&revready);
-        // pthread_mutex_unlock(&revlock);
+        pthread_mutex_lock(&revlock);
+        pthread_cond_signal(&revready);
+        pthread_mutex_unlock(&revlock);
 
         if(sl >= 20)
             break;
@@ -67,9 +67,9 @@ int main()
         pthread_cond_signal(&qready);
         pthread_mutex_unlock(&qlock);
 
-        // pthread_mutex_lock(&revlock);
-        // pthread_cond_wait(&revready, &revlock);
-        // pthread_mutex_unlock(&revlock);
+        pthread_mutex_lock(&revlock);
+        pthread_cond_wait(&revready, &revlock);
+        pthread_mutex_unlock(&revlock);
 
     }
     
