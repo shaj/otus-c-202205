@@ -8,6 +8,13 @@ set(SOURCES
 
 configure_file("${PROJECT_SOURCE_DIR}/src/version.h.in" "${PROJECT_BINARY_DIR}/version.h")
 
+add_executable(${PROJECT_NAME}0 src/main_0.c ${SOURCES})
+set_property(TARGET ${PROJECT_NAME}0 PROPERTY C_STANDARD 11)
+target_compile_options(${PROJECT_NAME}0 PUBLIC -Wall -Wextra -Wpedantic)
+target_include_directories(${PROJECT_NAME}0 PUBLIC "${PROJECT_BINARY_DIR}")
+target_link_libraries(${PROJECT_NAME}0 pthread)
+
+
 add_executable(${PROJECT_NAME}1 src/main_1.c ${SOURCES})
 set_property(TARGET ${PROJECT_NAME}1 PROPERTY C_STANDARD 11)
 target_compile_options(${PROJECT_NAME}1 PUBLIC -Wall -Wextra -Wpedantic)

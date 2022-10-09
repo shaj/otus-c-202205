@@ -350,6 +350,19 @@ const struct WordInfo *hashtable_get(HashTable *table, const char *key)
     return find_wi(table, key, hash);
 }
 
+void* hashtable_set_value(HashTable *table, const char *key, void *value)
+{
+    int hash = get_str_hash(key, table->size);
+    struct WordInfo *wi = find_wi(table, key, hash);
+    void *old_val = NULL;
+    if(wi != NULL)
+    {
+        old_val = wi->value;
+        wi->value = value;
+    }
+    return old_val;
+}
+
 /**
  * @brief      Удаление таблицы из памати
  *

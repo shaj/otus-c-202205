@@ -48,6 +48,9 @@ const struct WordInfo *hashtable_add(HashTable *table, char *key, void *value);
  */
 const struct WordInfo *hashtable_get(HashTable *table, const char *key);
 
+
+void* hashtable_set_value(HashTable *table, const char *key, void *value);
+
 /**
  * @brief      Удаление таблицы и освобождение памяти
  *

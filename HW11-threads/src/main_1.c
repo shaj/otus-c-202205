@@ -245,10 +245,28 @@ int line_parser(struct StatData *pdata, const char *line)
             *url_payload = size_object;
         pthread_mutex_lock(&(pdata->urls_mutex));
         wordinfo = hashtable_add(pdata->urls, url, url_payload);
-        if((wordinfo == NULL) || (wordinfo->counter != 1))
+        if (wordinfo == NULL)
         {
             free(url);
             free(url_payload);
+        }
+        else if (wordinfo->counter != 1)
+        {
+            free(url);
+            if((url_payload != NULL) && (wordinfo->value != NULL)
+                && (*url_payload > *((size_t*)wordinfo->value)))
+            {
+                // putc('^', stdout);
+                // fflush(stdout);
+                void *old_val = hashtable_set_value(pdata->urls, url, url_payload);
+                free(old_val);
+            }
+            else
+            {
+                // putc('v', stdout);
+                // fflush(stdout);
+                free(url_payload);
+            }
         }
         pthread_mutex_unlock(&(pdata->urls_mutex));
     }
@@ -351,8 +369,6 @@ void print_report(struct StatData *pdata)
     for (int i = 0; i < 10; i++)
     {
         hashtable_iter_init(&iter, pdata->urls);
-        // if(iter.wi == NULL)
-        //     break;
         max_word = iter.wi;
         while (iter.wi != NULL)
         {
@@ -378,8 +394,6 @@ void print_report(struct StatData *pdata)
     for (int i = 0; i < 10; i++)
     {
         hashtable_iter_init(&iter, pdata->referers);
-        // if(iter.wi == NULL)
-        //     break;
         max_word = iter.wi;
         while (iter.wi != NULL)
         {
