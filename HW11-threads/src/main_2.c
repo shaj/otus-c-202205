@@ -333,7 +333,7 @@ int line_parser(struct StatData *pdata, const char *line)
         url_payload = malloc(sizeof(size_t));
         if(url_payload != NULL)
             *url_payload = size_object;
-        pthread_mutex_lock(&(pdata->urls_mutex));
+        pthread_mutex_lock(&pdata->urls_mutex);
         wordinfo = hashtable_add(pdata->urls, url, url_payload);
         if (wordinfo == NULL)
         {
@@ -342,21 +342,17 @@ int line_parser(struct StatData *pdata, const char *line)
         }
         else if (wordinfo->counter != 1)
         {
-            free(url);
             if((url_payload != NULL) && (wordinfo->value != NULL)
                 && (*url_payload > *((size_t*)wordinfo->value)))
             {
-                // putc('^', stdout);
-                // fflush(stdout);
                 void *old_val = hashtable_set_value(pdata->urls, url, url_payload);
                 free(old_val);
             }
             else
             {
-                // putc('v', stdout);
-                // fflush(stdout);
                 free(url_payload);
             }
+            free(url);
         }
         pthread_mutex_unlock(&(pdata->urls_mutex));
     }

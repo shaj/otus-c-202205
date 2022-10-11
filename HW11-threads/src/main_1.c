@@ -252,21 +252,17 @@ int line_parser(struct StatData *pdata, const char *line)
         }
         else if (wordinfo->counter != 1)
         {
-            free(url);
             if((url_payload != NULL) && (wordinfo->value != NULL)
                 && (*url_payload > *((size_t*)wordinfo->value)))
             {
-                // putc('^', stdout);
-                // fflush(stdout);
                 void *old_val = hashtable_set_value(pdata->urls, url, url_payload);
                 free(old_val);
             }
             else
             {
-                // putc('v', stdout);
-                // fflush(stdout);
                 free(url_payload);
             }
+            free(url);
         }
         pthread_mutex_unlock(&(pdata->urls_mutex));
     }
