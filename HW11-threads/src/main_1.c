@@ -28,50 +28,190 @@ void print_version(const char *prog_name)
 }
 
 
-struct FileThreadData
+
+
+struct ThrdMsg
 {
-    char *file_name;
-    struct StatData *pdata;
+    char *line;
+    struct ThrdMsg *next;
 };
 
-struct ThrdList
+struct ThrdPool
 {
-    pthread_t pthrd;
-    struct FileThreadData *thrd_data;
-    struct ThrdList *next;
+    int count;
+    int queue_depth;
+    int queue_depth_max;
+    struct ThrdMsg *msg_queue;
+    pthread_t *thrd_arr;
+    pthread_cond_t qready;
+    pthread_mutex_t qlock;
+
+    bool quit_flag;
+
+    struct StatData *stat_data;
+    int (*stat_data_func)(struct StatData *, const char *);
 };
 
-void ThrdList_init(struct ThrdList **list)
+int thrd_pool_msg_push(struct ThrdPool *pool, const char *line)
 {
-    *list = NULL;
+    int retval;
+    pthread_mutex_lock(&pool->qlock);
+    struct ThrdMsg *new_msg = malloc(sizeof(struct ThrdMsg));
+    new_msg->next = pool->msg_queue;
+    new_msg->line = strdup(line);
+    pool->msg_queue = new_msg;
+    pool->queue_depth++;
+    retval = pool->queue_depth;
+    if (pool->queue_depth > pool->queue_depth_max)
+    {
+        pool->queue_depth_max = pool->queue_depth;
+    }
+    pthread_cond_signal(&pool->qready);
+    pthread_mutex_unlock(&pool->qlock);
+
+    return retval;
 }
 
-void ThrdList_push(struct ThrdList **list, pthread_t pthrd, struct FileThreadData *data)
+void *thrd_pool_msg_pop(void *p)
 {
-    struct ThrdList *new_it = malloc(sizeof(struct ThrdList));
-    new_it->next = *list;
-    new_it->pthrd = pthrd;
-    new_it->thrd_data = data;
-    *list = new_it;
+    struct ThrdPool *pool = p;
+    struct ThrdMsg *msg;
+    size_t line_cnt = 0;
+    bool quit_flag = false;
+    while (!quit_flag)
+    {
+        pthread_mutex_lock(&pool->qlock);
+        while (pool->msg_queue == NULL)
+        {
+            if ((pool->msg_queue == NULL) && pool->quit_flag)
+            {
+                quit_flag = true;
+                pthread_mutex_unlock(&pool->qlock);
+                break;
+            }
+            pthread_cond_wait(&pool->qready, &pool->qlock);
+        }
+        if (pool->msg_queue != NULL)
+        {
+            msg = pool->msg_queue;
+            pool->msg_queue = msg->next;
+            pool->queue_depth--;
+            pthread_mutex_unlock(&pool->qlock);
+
+            (*pool->stat_data_func)(pool->stat_data, msg->line);
+            line_cnt++;
+            free(msg->line);
+            free(msg);
+        }
+    }
+    return (void *)line_cnt;
 }
 
-pthread_t ThrdList_pop(struct ThrdList **list)
+struct ThrdPool *thrd_pool_create(int thrd_count, int (*thrd_func)(struct StatData *, const char *),
+                                  struct StatData *stat_data)
 {
-    if((list != NULL) && (*list != NULL))
+    struct ThrdPool *pool = malloc(sizeof(struct ThrdPool));
+    if (pool == NULL)
     {
-        pthread_t pthrd = (*list)->pthrd;
-        struct ThrdList *new_list = (*list)->next;
-        free((*list)->thrd_data->file_name);
-        free((*list)->thrd_data);
-        free(*list);
-        *list = new_list;
-        return pthrd;
+        return NULL;
     }
-    else
+    pool->thrd_arr = malloc(sizeof(pthread_t) * thrd_count);
+    if (pool->thrd_arr == NULL)
     {
-        return 0;
+        free(pool);
+        return NULL;
     }
+    pool->quit_flag = false;
+    pool->count = thrd_count;
+    pool->queue_depth = 0;
+    pool->queue_depth_max = 0;
+    pool->msg_queue = NULL;
+    pool->stat_data = stat_data;
+    pool->stat_data_func = thrd_func;
+    pthread_mutex_init(&pool->qlock, NULL);
+    pthread_cond_init(&pool->qready, NULL);
+    for (int i = 0; i < thrd_count; i++)
+    {
+        int ret = pthread_create(&pool->thrd_arr[i], NULL, thrd_pool_msg_pop, pool);
+        if (ret != 0)
+        {
+            /// Ааааа... Всё пропало...
+            return NULL;
+        }
+    }
+
+    return pool;
 }
+
+int thrd_pool_destroy(struct ThrdPool *pool)
+{
+    void *ret;
+    // int summ = 0;
+    pool->quit_flag = true;
+    pthread_mutex_lock(&pool->qlock);
+    pthread_cond_broadcast(&pool->qready);
+    pthread_mutex_unlock(&pool->qlock);
+    for (int i = 0; i < pool->count; i++)
+    {
+        pthread_join(pool->thrd_arr[i], &ret);
+        printf("Joined %16lx :: %ld\n", pool->thrd_arr[i], (long)ret);
+        // summ += ret[0];
+    }
+    pthread_mutex_destroy(&pool->qlock);
+    pthread_cond_destroy(&pool->qready);
+    free(pool->thrd_arr);
+    free(pool);
+    return 0;
+}
+
+
+
+
+
+// struct FileThreadData
+// {
+//     char *file_name;
+//     struct StatData *pdata;
+// };
+
+// struct ThrdList
+// {
+//     pthread_t pthrd;
+//     struct FileThreadData *thrd_data;
+//     struct ThrdList *next;
+// };
+
+// void ThrdList_init(struct ThrdList **list)
+// {
+//     *list = NULL;
+// }
+
+// void ThrdList_push(struct ThrdList **list, pthread_t pthrd, struct FileThreadData *data)
+// {
+//     struct ThrdList *new_it = malloc(sizeof(struct ThrdList));
+//     new_it->next = *list;
+//     new_it->pthrd = pthrd;
+//     new_it->thrd_data = data;
+//     *list = new_it;
+// }
+
+// pthread_t ThrdList_pop(struct ThrdList **list)
+// {
+//     if((list != NULL) && (*list != NULL))
+//     {
+//         pthread_t pthrd = (*list)->pthrd;
+//         struct ThrdList *new_list = (*list)->next;
+//         free((*list)->thrd_data->file_name);
+//         free((*list)->thrd_data);
+//         free(*list);
+//         *list = new_list;
+//         return pthrd;
+//     }
+//     else
+//     {
+//         return 0;
+//     }
+// }
 
 struct StatData
 {
@@ -409,22 +549,22 @@ void print_report(struct StatData *pdata)
     }
 }
 
+    // int (*stat_data_func)(struct StatData *, const char *);
 
-void* file_scan(void *d)
+int file_scan(struct StatData *stat, const char *fname)
 {
-    struct FileThreadData *data = (struct FileThreadData*) d;
     FILE *fp;
     char *line = NULL;
     size_t len = 0;
     ssize_t read;
     int line_cnt = 0;
 
-    fp = fopen(data->file_name, "r");
+    fp = fopen(fname, "r");
     if (fp == NULL)
     {
         putc('3', stdout);
         fflush(stdout);
-        return NULL;
+        return 0;
     }
 
     while ((read = getline(&line, &len, fp)) != -1)
@@ -437,11 +577,7 @@ void* file_scan(void *d)
             fflush(stdout);
             continue;
         }
-        line_parser(data->pdata, line);
-        // if (ret != 0)
-        // {
-        //     fprintf(stderr, "Parsing error in %s : %d %d\n", de->d_name, line_cnt, ret);
-        // }
+        line_parser(stat, line);
     }
 
     fclose(fp);
@@ -449,7 +585,7 @@ void* file_scan(void *d)
     {
         free(line);
     }
-    return NULL;
+    return line_cnt;
 }
 
 int main(int argc, char const *argv[])
@@ -501,14 +637,11 @@ int main(int argc, char const *argv[])
         exit(EXIT_FAILURE);
     }
 
-    // Подготовить пулл потоков
-
-    struct ThrdList *thrd_list;
-    ThrdList_init(&thrd_list);
-    
     struct StatData pdata[1];
     char full_name[2048];
     init_stat_data(pdata);
+    // Подготовить пулл потоков
+    struct ThrdPool *pool = thrd_pool_create(number_threads, file_scan, pdata);
 
     // Запустить сканирование
     while ((de = readdir(dir)) != NULL)
@@ -530,26 +663,14 @@ int main(int argc, char const *argv[])
             fflush(stdout);
             continue;
         }
-
-        pthread_t pthrd;
-        char *full_name_cpy = strdup(full_name);
-        struct FileThreadData *thrd_data = malloc(sizeof(struct FileThreadData));
-        thrd_data->file_name = full_name_cpy;
-        thrd_data->pdata = pdata;
-        pthread_create(&pthrd, NULL, file_scan, thrd_data);
-        ThrdList_push(&thrd_list, pthrd, thrd_data);
-        printf("thrd: 0x%016lx\n", pthrd);
+        thrd_pool_msg_push(pool, full_name);
     }
 
-    while (thrd_list != NULL)
-    {
-        pthread_join(thrd_list->pthrd, NULL);
-        printf("joined 0x%016lx\n", ThrdList_pop(&thrd_list));
-        fflush(stdout);
-    }
+    thrd_pool_destroy(pool);
 
     printf("all joined\n");
     fflush(stdout);
+
 
     // Вывести отчет
     print_report(pdata);
