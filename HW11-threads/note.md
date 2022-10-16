@@ -17,93 +17,61 @@
 
 https://github.com/jekstrand/rb-tree
 
+## Как очистить кэш файловой системы в Linux ядре
 
-## Версия без потоков
+Начиная с Linux ядра 2.6.16 появилась возможность принудительной очистки системных кэшей:
 
-./logscan 1 logs  50,31s user 8,51s system 48% cpu 2:01,37 total
-./logscan 1 logs  48,49s user 8,93s system 56% cpu 1:40,82 total
-./logscan 1 logs  49,34s user 9,17s system 53% cpu 1:48,58 total
-./logscan 1 logs  48,03s user 9,54s system 50% cpu 1:53,68 total
-./logscan 1 logs  49,12s user 10,61s system 46% cpu 2:09,32 total
+Чистим pagecache:
+`echo 1 > /proc/sys/vm/drop_caches`
 
-```
-CNT = 20843482
-Parts: 200 404 302 204 400 304 500 301 405 503 499 422 403 000 408 
-All objects size: 139603179994
-Status errors: 0
-URL's count: 47730
-Referers's count: 107541
+Чистим dentrie и inode кэши:
+`echo 2 > /proc/sys/vm/drop_caches`
+
+Чистим pagecache, dentrie и inode кэши:
+`echo 3 > /proc/sys/vm/drop_caches`
+
+Перед выполнением операции необходимо запустить команду `sync`
 
 
-URL's report:
-==========
-1258532  </random>
-219925  </>
-164097  </best/>
-57482  </стоят-пассажиры-в-аэропорту-посадочный-досмотр/>
-50527  </like/1>
-46103  </tag/мужик/>
-45023  </new/>
-43326  </rss/>
-28771  </да-алё-да-да-ну-как-там-с-деньгами/>
-26944  </tag/секс/>
-
-
-Referer's report:
-==========
-4672038  <->
-600019  <https://www.google.com/>
-207404  <https://yandex.ru/>
-123171  <https://www.google.ru/>
-97354  <https://baneks.site/best/>
-50127  <https://baneks.site/new/>
-42120  <http://yandex.ru/searchapp?text=>
-37415  <https://baneks.site/>
-32471  <https://baneks.site/best/?p=2>
-24728  <https://www.google.com.ua/>
+```sh
+sync && sudo su -c "echo 3 > /proc/sys/vm/drop_caches"
 ```
 
-Доброго дня. Разбираюсь сейчас с многопоточностью. У нас в 22 лекции был такой
-пример с condition variable:
+## Варианты
 
-```c
-#include <pthread.h>
+`0`  - без потоков
+`1`  - один поток на каждый файл. Все файлы читаются одновременно.
+       Прочитанные данные сразу пишутся в одну структуру.
+`2`  - пул потоков для записи в структуру. Файлы читаются в одном потоке.
+       Каждая строка ставится в очередь. Пул потоков обрабатывает очередь.
+       Обработанные строки пишутся в одну структуру.
+`21` - также, как 2, только в кадом потоке в пуле своя структура данных.
+       При завершении потока эти данные объединяются с общей структурой.
+`3`  - пул потоков для обработки файла. В очереди сообщений имена файлов
+       для обработки. У каждого потока своя структура данных. При выходе
+       из потока структура объединяется с общей.
 
-struct msg
-{
-    struct msg *m_next;
-    /* ... другие поля структуры ... */
-};
+All | User | System | CPU% | принудительное переключение контекста | добровольное переключение контекста | количество чтений с диска
 
-struct msg *workq;
-pthread_cond_t qready = PTHREAD_COND_INITIALIZER;
-pthread_mutex_t qlock = PTHREAD_MUTEX_INITIALIZER;
+./logscan0
+120.23  53.45 10.18   616    2628 19167824
+./logscan1
+123.04  67.57 17.24  3707  498101 19155304
+./logscan2
+109.25 116.59 76.30 21605 7082129 19155272
+./logscan21
+102.41 120.62 74.15  6556 6754924 19155280
+./logscan3
+174.47  72.71 13.40   944    3211 19155280
 
-void process_msg()
-{
-    struct msg *mp;
-    for (;;)
-    {
-        pthread_mutex_lock(&qlock);
-        while (workq == NULL)
-            pthread_cond_wait(&qready, &qlock);
-        mp = workq;
-        workq = mp->m_next;
-        pthread_mutex_unlock(&qlock);
-        /* обработка сообщения mp */
-    }
-}
+./logscan0
+103.17 51.67 10.22 59%% 643 2569 19161176
+./logscan1
+117.56 62.86 14.69 65%% 4143 261889 19155880
+./logscan2
+98.81 114.62 75.50 192%% 20580 7068735 19157184
+./logscan21
+108.05 123.34 75.11 183%% 7693 6441106 19160032
+./logscan3
+123.61 64.72 12.57 62%% 3908 4729 19162720
 
-void enqueue_msg(struct msg *mp)
-{
-    pthread_mutex_lock(&qlock);
-    mp->m_next = workq;
-    workq = mp;
-    pthread_mutex_unlock(&qlock);
-    pthread_cond_signal(&qready);
-}
-```
-
-Вопрос - как организовать ожидание, если я хочу ограничить длину
-очереди `workq`? То есть перед тем как добавлять новое сообщение,
-я хочу подождать, пока хотя бы одно сообщение обработается.

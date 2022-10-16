@@ -502,7 +502,7 @@ void print_report(struct StatData *pdata)
 
 int main(int argc, char const *argv[])
 {
-    int retval = EXIT_FAILURE;
+    int retval = EXIT_SUCCESS;
     struct stat sb;
     int number_threads;
 

@@ -28,6 +28,19 @@ target_compile_options(${PROJECT_NAME}2 PUBLIC -Wall -Wextra -Wpedantic)
 target_include_directories(${PROJECT_NAME}2 PUBLIC "${PROJECT_BINARY_DIR}")
 target_link_libraries(${PROJECT_NAME}2 pthread)
 
+add_executable(${PROJECT_NAME}21 src/main_21.c ${SOURCES})
+set_property(TARGET ${PROJECT_NAME}21 PROPERTY C_STANDARD 11)
+target_compile_options(${PROJECT_NAME}21 PUBLIC -Wall -Wextra -Wpedantic)
+target_include_directories(${PROJECT_NAME}21 PUBLIC "${PROJECT_BINARY_DIR}")
+target_link_libraries(${PROJECT_NAME}21 pthread)
+
+
+add_executable(${PROJECT_NAME}3 src/main_3.c ${SOURCES})
+set_property(TARGET ${PROJECT_NAME}3 PROPERTY C_STANDARD 11)
+target_compile_options(${PROJECT_NAME}3 PUBLIC -Wall -Wextra -Wpedantic)
+target_include_directories(${PROJECT_NAME}3 PUBLIC "${PROJECT_BINARY_DIR}")
+target_link_libraries(${PROJECT_NAME}3 pthread)
+
 
 
 add_executable(maint src/main-t.c)

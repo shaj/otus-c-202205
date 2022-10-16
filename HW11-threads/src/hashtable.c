@@ -363,6 +363,18 @@ void* hashtable_set_value(HashTable *table, const char *key, void *value)
     return old_val;
 }
 
+int hashtable_appand(HashTable *table, const char *key, size_t count)
+{
+    int hash = get_str_hash(key, table->size);
+    struct WordInfo *wi = find_wi(table, key, hash);
+    if(wi != NULL)
+    {
+        wi->counter += count;
+        return 0;
+    }
+    return -1;
+}
+
 /**
  * @brief      Удаление таблицы из памати
  *

@@ -48,8 +48,25 @@ const struct WordInfo *hashtable_add(HashTable *table, char *key, void *value);
  */
 const struct WordInfo *hashtable_get(HashTable *table, const char *key);
 
-
+/**
+ * @brief Установка новых данных для ключа
+ * 
+ * @param table  - таблица
+ * @param key    - ключ, для которого устанавливается значение
+ * @param value  - новые данные
+ * @return void* - старые данные
+ */
 void* hashtable_set_value(HashTable *table, const char *key, void *value);
+
+/**
+ * @brief 
+ * 
+ * @param table 
+ * @param key 
+ * @param count 
+ * @return int 
+ */
+int hashtable_appand(HashTable *table, const char *key, size_t count);
 
 /**
  * @brief      Удаление таблицы и освобождение памяти
