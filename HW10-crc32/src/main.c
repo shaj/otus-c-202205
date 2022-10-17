@@ -23,13 +23,11 @@ void print_version(const char *prog_name)
 
 int main(int argc, char const *argv[])
 {
-    int retval = EXIT_FAILURE;
+    int retval = EXIT_SUCCESS;
     int fd;
     struct stat sb;
     char *addr = NULL;
-    size_t length = (100 * 1024 * 1024) & ~(sysconf(_SC_PAGE_SIZE) - 1);
-    off_t offset;
-    uint32_t crc = 0;
+    uint32_t crc;
 
     // Проверка аргументов командной строки
     if ((argc > 1) && (strcmp(argv[1], "--version") == 0))
@@ -62,29 +60,22 @@ int main(int argc, char const *argv[])
         exit(EXIT_FAILURE);
     }
 
-    for(offset = 0; offset < sb.st_size; offset += length)
+    addr = mmap(addr, sb.st_size, PROT_READ, MAP_PRIVATE, fd, 0);
+    if (addr == MAP_FAILED)
     {
-        if((size_t)(sb.st_size - offset) < length)
-        {
-            length = sb.st_size - offset;
-        }
-        addr = mmap(addr, length, PROT_READ, MAP_PRIVATE, fd, offset);
-        if (addr == MAP_FAILED)
-        {
-            fprintf(stderr, "Can not mmap file \"%s\" at length %lu  offset %lu\n",
-                    argv[1], length, offset);
-            retval = EXIT_FAILURE;
-            goto exit_1;
-        }
-        crc = singletable_crc32c(crc, addr, length);
-        // putc('.', stdout);
-        // fflush(stdout);
+        fprintf(stderr, "Can not mmap file \"%s\" at length %lu\n",
+                argv[1], sb.st_size);
+        retval = EXIT_FAILURE;
+        goto exit_1;
     }
+
+    crc = 0;
+    crc = crc32(crc, addr, sb.st_size);
 
     printf("%x  %s\n", crc, argv[1]);
 
 exit_1:
-    munmap(addr, length);
+    munmap(addr, sb.st_size);
     close(fd);
 
     return retval;

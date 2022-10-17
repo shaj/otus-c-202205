@@ -684,7 +684,7 @@ int main(int argc, char const *argv[])
     struct StatData pdata[1];
     char full_name[2048];
     init_stat_data(pdata);
-    // Подготовить пулл потоков
+    // Подготовить пул потоков
     struct ThrdPool *pool = thrd_pool_create(number_threads, file_scan, pdata);
 
     // Запустить сканирование
