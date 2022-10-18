@@ -11,7 +11,6 @@
 #include <unistd.h>
 
 #include "version.h"
-#include "crc32.h"
 
 void print_usage(const char *prog_name) { printf("Usage: %s <input file>\n", prog_name); }
 
