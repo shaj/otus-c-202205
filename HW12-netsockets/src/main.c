@@ -1,14 +1,13 @@
 
-#include <fcntl.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <sys/mman.h>
-#include <sys/stat.h>
-#include <sys/types.h>
-#include <unistd.h>
+
+#include <arpa/inet.h>
+#include <netdb.h>
+#include <netinet/in.h>
 
 #include "version.h"
 
@@ -23,10 +22,10 @@ void print_version(const char *prog_name)
 int main(int argc, char const *argv[])
 {
     int retval = EXIT_SUCCESS;
-    int fd;
-    struct stat sb;
-    char *addr = NULL;
-    uint32_t crc;
+    // int fd;
+    // struct stat sb;
+    // char *addr = NULL;
+    // uint32_t crc;
 
     // Проверка аргументов командной строки
     if ((argc > 1) && (strcmp(argv[1], "--version") == 0))
@@ -41,41 +40,70 @@ int main(int argc, char const *argv[])
         exit(EXIT_FAILURE);
     }
 
-    // Открытие входного файлов
-    fd = open(argv[1], O_RDONLY);
-    if (fd == -1)
+    struct addrinfo hints;
+    struct addrinfo *addr_info, *rp;
+
+    memset(&hints, 0, sizeof(struct addrinfo));
+    hints.ai_family = AF_UNSPEC;     /* Allow IPv4 or IPv6 */
+    hints.ai_socktype = SOCK_STREAM; /* Datagram socket */
+    hints.ai_flags = AI_PASSIVE;     /* For wildcard IP address */
+    hints.ai_protocol = 0;           /* Any protocol */
+    hints.ai_canonname = NULL;
+    hints.ai_addr = NULL;
+    hints.ai_next = NULL;
+
+    int ret = getaddrinfo(argv[1], NULL, &hints, &addr_info);
+    if (ret != 0)
     {
-        fprintf(stderr, "Can not open file \"%s\"\n", argv[1]);
+        fprintf(stderr, "get addr info error: %d %s\n", ret, gai_strerror(ret));
         exit(EXIT_FAILURE);
     }
-    if(fstat(fd, &sb) == -1)
-    {
-        fprintf(stderr, "Can not stat file \"%s\"\n", argv[1]);
-        exit(EXIT_FAILURE);
-    }
-    if ((sb.st_mode & S_IFMT) != S_IFREG)
-    {
-        fprintf(stderr, "The \"%s\" is not a regular file\n", argv[1]);
-        exit(EXIT_FAILURE);
-    }
 
-    addr = mmap(addr, sb.st_size, PROT_READ, MAP_PRIVATE, fd, 0);
-    if (addr == MAP_FAILED)
+    for (rp = addr_info; rp != NULL; rp = rp->ai_next)
     {
-        fprintf(stderr, "Can not mmap file \"%s\" at length %lu\n",
-                argv[1], sb.st_size);
-        retval = EXIT_FAILURE;
-        goto exit_1;
+        // sfd = socket(rp->ai_family, rp->ai_socktype, rp->ai_protocol);
+        // if (sfd == -1)
+        //     continue;
+
+        // if (bind(sfd, rp->ai_addr, rp->ai_addrlen) == 0)
+        //     break; /* Success */
+
+        // close(sfd);
+        char ip_str[INET_ADDRSTRLEN];
+        inet_ntop(AF_INET, &(((struct sockaddr_in *)rp->ai_addr)->sin_addr), ip_str,
+                  INET_ADDRSTRLEN);
+        printf("%p,   %u,   %s\n", rp, ((struct sockaddr_in *)rp->ai_addr)->sin_addr.s_addr,
+               ip_str);
     }
 
-    crc = 0;
-    crc = crc32(crc, addr, sb.st_size);
+    if (connect(sock_fd, (struct sockaddr *)&sock_addr, sizeof(sock_addr)) < 0)
+    {
+        perror("connect");
+        close(sock_fd);
+        return EXIT_FAILURE;
+    }
+    if (send(sock_fd, argv[2], strlen(argv[2]), 0) < 0)
+    {
+        perror("send");
+        close(sock_fd);
+        return EXIT_FAILURE;
+    }
+    int len = 0;
+    while ((r = recv(sock_fd, &buffer[len], BUF_SIZE - len, 0)) > 0)
+    {
+        len += r;
+    }
+    if (r < 0)
+    {
+        perror("recv");
+        close(sock_fd);
+        return EXIT_FAILURE;
+    }
+    puts(buffer);
+    shutdown(sock_fd, SHUT_RDWR);
+    close(sock_fd);
 
-    printf("%x  %s\n", crc, argv[1]);
-
-    munmap(addr, sb.st_size);
-exit_1:
-    close(fd);
+    freeaddrinfo(addr_info);
 
     return retval;
 }
