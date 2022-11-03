@@ -1,0 +1,10 @@
+package "prt"
+version "0.0.1"
+purpose "Netsockets"
+versiontext "Starting"
+
+args "--unnamed-opts "
+
+option "all-fonts" a "Print with all fonts" flag off
+option "font-name" f "Font name" string typestr="filename" optional multiple default=""
+option "print-fonts" p "Print all fonts" flag off

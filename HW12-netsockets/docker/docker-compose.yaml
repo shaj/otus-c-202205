@@ -1,0 +1,15 @@
+version: '3.5'
+
+services:
+  gccb:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+      args:
+        S_UID: ${S_UID}
+        S_GID: ${S_GID}
+    command: bash
+    volumes:
+      - ..:/home/dev/project:z
+    stdin_open: true
+    tty: true
