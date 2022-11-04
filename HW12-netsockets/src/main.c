@@ -19,7 +19,18 @@
 #define BUF_SIZE (1024 * 10)
 #define SERVICE_NAME "telehack.com"
 
-
+/**
+ * @brief Передача команды серверу
+ *
+ * Если передача не удалась, в stderr выводится сообщение
+ * об ошибке.
+ *
+ * @param sock_fd - сокет, куда посылать
+ * @param buf     - буфер, который посылать
+ * @param len     - размер данных в буфере
+ * @return int  0 - передача удалась
+ *             !0 - передача не удалась
+ */
 int prt_send(int sock_fd, const char *buf, int len)
 {
     int retval = 0;
@@ -30,6 +41,16 @@ int prt_send(int sock_fd, const char *buf, int len)
     return !(retval < 0);
 }
 
+/**
+ * @brief Прием сообщения от сервера
+ *
+ * При ошибке приема в stderr выводится сообщение об ошибке.
+ *
+ * @param sock_fd - сокет, откуда принимать
+ * @param buffer  - указатель на выделенную память, куда принимать
+ * @param size    - размер буфера
+ * @return int    - количество принятых байт.
+ */
 int prt_recv(int sock_fd, char *buffer, int size)
 {
     ssize_t len = 0;
@@ -65,17 +86,25 @@ int prt_recv(int sock_fd, char *buffer, int size)
         retval = len;
     }
 
-    if (len == size)
-    {
-        buffer[size - 1] = '\0';
-    }
-    else
-    {
-        buffer[len] = '\0';
-    }
+    // if (len == size)
+    // {
+    //     buffer[size - 1] = '\0';
+    // }
+    // else
+    // {
+    //     buffer[len] = '\0';
+    // }
     return retval;
 }
 
+/**
+ * @brief Печать результата выполнения команды figlet
+ *
+ * TODO: Удалить лишние строки из ответа
+ *
+ * @param buffer - буфер с сообщением
+ * @param len    - размер сообщения в буфере
+ */
 void print_figlet(const char *buffer, int len)
 {
     for (const char *c = buffer; c < (buffer + len); c++)
@@ -92,6 +121,16 @@ void print_figlet(const char *buffer, int len)
     putc('\n', stdout);
 }
 
+/**
+ * @brief Получение списка шрифтов из ответа сервера на команду figlet.
+ *
+ * После использования полученный массив необходимо удалить
+ * с помощью функции clear_fonts.
+ *
+ * @param buf     - буфер с ответом от сервера
+ * @param size    - размер ответа в буфере
+ * @return char** - массив строк с названиями шрифтов
+ */
 char **get_fonts(const char *buf, int size)
 {
     char **fonts = calloc(1024, sizeof(char *));
@@ -137,6 +176,11 @@ char **get_fonts(const char *buf, int size)
     return fonts;
 }
 
+/**
+ * @brief Удаление списка шрифтов, полученного функцией get_fonts
+ *
+ * @param fonts - список шрифтов
+ */
 void clear_fonts(char **fonts)
 {
     char **font = fonts;
@@ -148,49 +192,61 @@ void clear_fonts(char **fonts)
     free(fonts);
 }
 
-int main(int argc, char *argv[])
+/**
+ * @brief Создание строки сообщения из параметров запуска
+ *
+ * Строка должна быть удалена после использования.
+ *
+ * @param args_info
+ * @return char*
+ */
+char *create_message(const struct gengetopt_args_info *args_info)
 {
-    int retval = EXIT_SUCCESS;
-    int message_size;
     char *message_string;
     char *message_p;
-
-    struct gengetopt_args_info args_info;
-    if (cmdline_parser(argc, argv, &args_info) != 0)
+    int message_size = 0;
+    for (unsigned int i = 0; i < args_info->inputs_num; ++i)
     {
-        exit(1);
+        message_size += strlen(args_info->inputs[i]) + 1;
+    }
+    if(message_size == 0)
+    {
+        return NULL;
     }
 
-    puts("Test string parts:");
-    message_size = 0;
-    for (unsigned int i = 0; i < args_info.inputs_num; ++i)
-    {
-        message_size += strlen(args_info.inputs[i]) + 1;
-    }
     message_string = malloc(message_size + 1);
-    message_p = message_string;
-    for (unsigned int i = 0; i < args_info.inputs_num; ++i)
+    if (message_string == NULL)
     {
-        strcpy(message_p, args_info.inputs[i]);
-        message_p += strlen(args_info.inputs[i]);
+        return NULL;
+    }
+
+    message_p = message_string;
+    for (unsigned int i = 0; i < args_info->inputs_num; ++i)
+    {
+        strcpy(message_p, args_info->inputs[i]);
+        message_p += strlen(args_info->inputs[i]);
         *message_p = ' ';
         message_p++;
     }
-    printf("Message: <%s>\n", message_string);
-    printf("all_flags %d\nfont_name <%d>\n", args_info.all_fonts_flag, args_info.font_name_given);
+    return message_string;
+}
 
+/**
+ * @brief Подключение к "telehack.com"
+ * 
+ * @return int - sock_fd. Отрицательное значение - ошибка.
+ */
+int connect_to_server()
+{
     struct addrinfo hints;
     struct addrinfo *addr_info, *rp;
     int sock_fd;
-    char buffer[BUF_SIZE];
-    int recv_count;
-    char cmd_buf[256];
 
     memset(&hints, 0, sizeof(struct addrinfo));
-    hints.ai_family = AF_UNSPEC;     /* Allow IPv4 or IPv6 */
-    hints.ai_socktype = SOCK_STREAM; /* Datagram socket */
-    hints.ai_flags = AI_PASSIVE;     /* For wildcard IP address */
-    hints.ai_protocol = IPPROTO_TCP; /* Any protocol */
+    hints.ai_family = AF_UNSPEC;
+    hints.ai_socktype = SOCK_STREAM;
+    hints.ai_flags = AI_PASSIVE;
+    hints.ai_protocol = IPPROTO_TCP;
     hints.ai_canonname = NULL;
     hints.ai_addr = NULL;
     hints.ai_next = NULL;
@@ -199,7 +255,7 @@ int main(int argc, char *argv[])
     if (ret != 0)
     {
         fprintf(stderr, "get addr info error: %d %s\n", ret, gai_strerror(ret));
-        exit(EXIT_FAILURE);
+        return -1;
     }
 
     for (rp = addr_info; rp != NULL; rp = rp->ai_next)
@@ -218,12 +274,59 @@ int main(int argc, char *argv[])
     {
         perror("connect");
         close(sock_fd);
+        freeaddrinfo(addr_info);
+        return -2;
+    }
+
+    freeaddrinfo(addr_info);
+    return sock_fd;
+}
+
+/**
+ * @brief main
+ *
+ * @param argc
+ * @param argv
+ * @return int
+ */
+int main(int argc, char *argv[])
+{
+    int retval = EXIT_SUCCESS;
+    char *message_string;
+
+    struct gengetopt_args_info args_info;
+    if (cmdline_parser(argc, argv, &args_info) != 0)
+    {
+        return EXIT_FAILURE;
+    }
+
+    message_string = create_message(&args_info);
+    printf("Message: <%s>\n", message_string);
+    // printf("all_flags %d\nfont_name <%d>\n", args_info.all_fonts_flag,
+    // args_info.font_name_given);
+
+    if (message_string == NULL)
+    {
+        fprintf(stderr, "Message string must be specified\n\n");
+        cmdline_parser_print_help();
+        return EXIT_FAILURE;
+    }
+
+    int sock_fd = connect_to_server();
+    if(sock_fd <= 0)
+    {
         return EXIT_FAILURE;
     }
     puts("Connected");
 
+    char buffer[BUF_SIZE];
+    int recv_count;
+    char cmd_buf[256];
+
     // Отсюда:
     // https://www.rfc-editor.org/rfc/rfc1073
+    // Нужно, чтобы список шрифтов не разбивался.
+    // TODO: ширину брать из текущего терминала.
     prt_send(sock_fd, "\xff\xfb\x1f", 3); // "\255\251\31"
     prt_send(sock_fd, "\xff\xfa\x1f\x00\x50\x00\x64\xff\xf0", 9); // "\255\250\31\0\80\0\100\255\240"
     recv_count = prt_recv(sock_fd, buffer, BUF_SIZE);
@@ -232,13 +335,21 @@ int main(int argc, char *argv[])
     {
         prt_send(sock_fd, "figlet\r\n", 8);
         recv_count = prt_recv(sock_fd, buffer, BUF_SIZE);
+        if(recv_count == BUF_SIZE)
+        {
+            buffer[BUF_SIZE] = '\0';
+        }
+        else
+        {
+            buffer[recv_count] = '\0';
+        }
         puts(buffer);
     }
     else if (args_info.all_fonts_flag)
     {
         prt_send(sock_fd, "figlet\r\n", 8);
-        prt_recv(sock_fd, buffer, BUF_SIZE);
-        char **fonts = get_fonts(buffer, BUF_SIZE);
+        recv_count = prt_recv(sock_fd, buffer, BUF_SIZE);
+        char **fonts = get_fonts(buffer, recv_count);
         char **font = fonts;
         int cnt = 0;
         while ((*font != NULL) && (cnt < 5))
@@ -255,7 +366,7 @@ int main(int argc, char *argv[])
     }
     else if (args_info.font_name_given != 0)
     {
-        for(unsigned int i = 0; i < args_info.font_name_given; i++)
+        for (unsigned int i = 0; i < args_info.font_name_given; i++)
         {
             printf("Font: %s\n", args_info.font_name_arg[i]);
             snprintf(cmd_buf, 256, "figlet /%s %s\r\n", args_info.font_name_arg[i], message_string);
@@ -275,11 +386,9 @@ int main(int argc, char *argv[])
     shutdown(sock_fd, SHUT_RDWR);
     close(sock_fd);
 
-    freeaddrinfo(addr_info);
-
     free(message_string);
 
-    cmdline_parser_free (&args_info);
+    cmdline_parser_free(&args_info);
 
     return retval;
 }

@@ -6,5 +6,5 @@ versiontext "Starting"
 args "--unnamed-opts "
 
 option "all-fonts" a "Print with all fonts" flag off
-option "font-name" f "Font name" string typestr="filename" optional multiple default=""
+option "font-name" f "Printing with the specified font" string typestr="fontname" optional multiple default=""
 option "print-fonts" p "Print all fonts" flag off
