@@ -1,0 +1,3 @@
+[submodule "HW13-HTTP/example/otus-io-uring"]
+	path = HW13-HTTP/example/otus-io-uring
+	url = https://gitlab.com/otusteam/otus-io-uring.git
