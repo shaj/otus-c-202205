@@ -351,8 +351,7 @@ int main(int argc, char *argv[])
         recv_count = prt_recv(sock_fd, buffer, BUF_SIZE);
         char **fonts = get_fonts(buffer, recv_count);
         char **font = fonts;
-        int cnt = 0;
-        while ((*font != NULL) && (cnt < 5))
+        while ((*font != NULL))
         {
             printf("Font: %s\n", *font);
             snprintf(cmd_buf, 256, "figlet /%s %s\r\n", *font, message_string);
@@ -360,7 +359,6 @@ int main(int argc, char *argv[])
             recv_count = prt_recv(sock_fd, buffer, BUF_SIZE);
             print_figlet(buffer, recv_count);
             font++;
-            cnt++;
         }
         clear_fonts(fonts);
     }
